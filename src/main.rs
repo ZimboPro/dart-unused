@@ -1,3 +1,4 @@
+use dart_unused::get_unreferenced_files;
 use log::LevelFilter;
 use simplelog::{ColorChoice, ConfigBuilder, TermLogger, TerminalMode};
 
@@ -11,6 +12,5 @@ fn main() -> anyhow::Result<()> {
         TerminalMode::Mixed,
         ColorChoice::Auto,
     )?;
-    println!("Hello, world!");
-    Ok(())
+    get_unreferenced_files()
 }
