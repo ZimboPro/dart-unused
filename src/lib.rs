@@ -21,6 +21,22 @@ use crate::{
     localisation::all_localisation,
 };
 
+struct ExtractData {
+    labels_referenced: HashSet<String>,
+    locators: HashMap<String, bool>,
+    referenced_files: HashSet<PathBuf>,
+}
+
+impl ExtractData {
+    fn new() -> Self {
+        Self {
+            labels_referenced: HashSet::with_capacity(10_000),
+            locators: HashMap::with_capacity(300),
+            referenced_files: HashSet::with_capacity(10_000),
+        }
+    }
+}
+
 pub fn get_unreferenced_files() -> anyhow::Result<()> {
     let args = cli::CLI::parse();
     let config: config::Config = if let Ok(s) = std::fs::read_to_string("unused.config.yaml") {
@@ -37,27 +53,24 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
     } else {
         Vec::new()
     };
-    let mut labels_referenced: HashSet<String> = HashSet::with_capacity(10_000);
-    let mut locators = HashMap::with_capacity(300);
-    let mut referenced_files: HashSet<PathBuf> = HashSet::with_capacity(10_000);
+    let mut extracted_data = ExtractData::new();
     // TODO allow to set entry point
     localisation::set_class_name(&pubspec.flutter_intl.class_name)?;
     let main = PathBuf::from("lib/main.dart");
-    referenced_files.insert(main.clone());
+    extracted_data.referenced_files.insert(main.clone());
+
     extract_data(
         &main,
         &pubspec.name,
-        &mut referenced_files,
+        &mut extracted_data,
         &mut deps,
         &mut assets,
-        &mut labels_referenced,
-        &mut locators,
         &args,
     )?;
 
     let dart = glob("lib/**/*.dart").expect("Failed to read glob pattern");
     let mut dart: Vec<PathBuf> = dart.flatten().collect();
-    dart.retain(|path| !referenced_files.contains(path));
+    dart.retain(|path| !extracted_data.referenced_files.contains(path));
     if !assets.is_empty() {
         let assets: HashSet<PathBuf> = assets
             .into_iter()
@@ -93,7 +106,7 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
             }
         }
 
-        all_localisation_keys.retain(|x| !labels_referenced.contains(x));
+        all_localisation_keys.retain(|x| !extracted_data.labels_referenced.contains(x));
 
         for label in all_localisation_keys.iter().enumerate() {
             log::error!(
@@ -106,8 +119,8 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
     }
 
     if args.loc {
-        locators.retain(|_, v| !*v);
-        for (ind, (k, _)) in locators.iter().enumerate() {
+        extracted_data.locators.retain(|_, v| !*v);
+        for (ind, (k, _)) in extracted_data.locators.iter().enumerate() {
             log::error!("{}. Unused locator: {:?}", ind + 1, k);
         }
         log::info!("");
@@ -122,11 +135,9 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
 fn extract_data(
     file_path: &std::path::PathBuf,
     package_name: &str,
-    referenced_files: &mut HashSet<PathBuf>,
+    extracted_data: &mut ExtractData,
     deps: &mut Vec<String>,
     assets: &mut Vec<OsStringWithStr>,
-    labels: &mut HashSet<String>,
-    locators: &mut HashMap<String, bool>,
     args: &cli::CLI,
 ) -> anyhow::Result<()> {
     let contents = std::fs::read_to_string(file_path).expect("Failed to read file");
@@ -138,16 +149,19 @@ fn extract_data(
                     let file = path.replace("%20", " ");
                     let file = Path::new(&file);
                     let file = file_path.parent().unwrap().join(file);
-                    if !referenced_files.contains(&file.to_path_buf()) {
-                        referenced_files.insert(file.parse_dot().unwrap().to_path_buf());
+                    if !extracted_data
+                        .referenced_files
+                        .contains(&file.to_path_buf())
+                    {
+                        extracted_data
+                            .referenced_files
+                            .insert(file.parse_dot().unwrap().to_path_buf());
                         extract_data(
                             &file.parse_dot().unwrap().to_path_buf(),
                             package_name,
-                            referenced_files,
+                            extracted_data,
                             deps,
                             assets,
-                            labels,
-                            locators,
                             args,
                         )?;
                     }
@@ -158,16 +172,17 @@ fn extract_data(
                         path.insert_str(0, "lib");
                         let path = path.replace("%20", " ");
                         let file = Path::new(&path);
-                        if !referenced_files.contains(&file.to_path_buf()) {
-                            referenced_files.insert(file.to_path_buf());
+                        if !extracted_data
+                            .referenced_files
+                            .contains(&file.to_path_buf())
+                        {
+                            extracted_data.referenced_files.insert(file.to_path_buf());
                             extract_data(
                                 &file.to_path_buf(),
                                 package_name,
-                                referenced_files,
+                                extracted_data,
                                 deps,
                                 assets,
-                                labels,
-                                locators,
                                 args,
                             )?;
                         }
@@ -181,22 +196,25 @@ fn extract_data(
                     // part files
                     let mut file = file_path.clone();
                     file.set_file_name(value);
-                    referenced_files.insert(file);
+                    extracted_data.referenced_files.insert(file);
                 }
                 parser::DartFile::Export(path) => {
                     let file = path.replace("%20", " ");
                     let file = Path::new(&file);
                     let file = file_path.parent().unwrap().join(file);
-                    if !referenced_files.contains(&file.to_path_buf()) {
-                        referenced_files.insert(file.parse_dot().unwrap().to_path_buf());
+                    if !extracted_data
+                        .referenced_files
+                        .contains(&file.to_path_buf())
+                    {
+                        extracted_data
+                            .referenced_files
+                            .insert(file.parse_dot().unwrap().to_path_buf());
                         extract_data(
                             &file.parse_dot().unwrap().to_path_buf(),
                             package_name,
-                            referenced_files,
+                            extracted_data,
                             deps,
                             assets,
-                            labels,
-                            locators,
                             args,
                         )?;
                     }
@@ -236,7 +254,7 @@ fn extract_data(
         let s = all_localisation(&contents);
         if let Ok((_, keys)) = s {
             for key in keys {
-                labels.insert(key.to_owned());
+                extracted_data.labels_referenced.insert(key.to_owned());
             }
         }
     }
@@ -247,10 +265,10 @@ fn extract_data(
         for reg in r {
             match reg {
                 locator::Locator::Register(s) => {
-                    locators.entry(s).or_insert(false);
+                    extracted_data.locators.entry(s).or_insert(false);
                 }
                 locator::Locator::Get(s) => {
-                    locators.insert(s, true);
+                    extracted_data.locators.insert(s, true);
                 }
                 _ => {}
             }

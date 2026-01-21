@@ -127,7 +127,7 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// Parses a Dart file statement and returns a `DartFile` variant.
 ///
 /// ```rust
-/// use parser::parser::{DartFile, dart_file};
+/// use dart_unused::parser::{DartFile, dart_file};
 ///
 /// let input = "import 'flutter/material.dart';";
 /// let expected = DartFile::Import("flutter/material.dart".to_string());
@@ -136,7 +136,7 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// ```
 ///
 /// ```rust
-/// use parser::parser::{DartFile, dart_file};
+/// use dart_unused::parser::{DartFile, dart_file};
 ///
 /// let input = "import 'package:flutter/material.dart';";
 /// let expected = DartFile::Package("flutter".to_string(), "/material.dart".to_string());
@@ -145,7 +145,7 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// ```
 ///
 /// ```rust
-/// use parser::parser::{DartFile, dart_file};
+/// use dart_unused::parser::{DartFile, dart_file};
 ///
 /// let input = "part 'material.g.dart';";
 /// let expected = DartFile::Part("material.g.dart".to_string());
@@ -154,7 +154,7 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// ```
 ///
 /// ```rust
-/// use parser::parser::{DartFile, dart_file};
+/// use dart_unused::parser::{DartFile, dart_file};
 ///
 /// let input = "import 'dart:io';";
 /// let result = dart_file(input);
@@ -162,7 +162,7 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// ```
 ///
 /// ```rust
-/// use parser::parser::{DartFile, dart_file};
+/// use dart_unused::parser::{DartFile, dart_file};
 ///
 /// let input = "import 'flutter/material.dart';";
 /// let expected = DartFile::Import("flutter/material.dart".to_string());
