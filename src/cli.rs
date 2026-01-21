@@ -13,22 +13,22 @@ pub struct CLI {
     pub path: PathBuf,
     // #[arg(short, long, help = "Path to the Dart package arb file")]
     // package: PathBuf,
-    #[arg(long, help = "Remove unreferenced items")]
-    pub remove: bool,
+    // #[arg(long, help = "Remove unreferenced items")]
+    // pub remove: bool,
     #[arg(short, long, help = "Check for unreferenced assets")]
     pub assets: bool,
     #[arg(short, long, help = "Check for unreferenced dependencies")]
     pub deps: bool,
-    #[arg(long, help = "Check for unreferenced dart files")]
-    pub dart: bool,
+    // #[arg(long, help = "Check for unreferenced dart files")]
+    // pub dart: bool,
     #[arg(short, long, help = "Check for unused arb file(s) entries")]
     pub labels: bool,
     #[arg(long, help = "List items registered in locator but not used")]
     pub loc: bool,
-    #[arg(long, short)]
-    pub format: bool,
-    #[arg(long, short)]
-    pub warn: bool,
-    #[arg(long, short, help = "Output the results to a file")]
-    pub output: bool,
+    // #[arg(long, short)]
+    // pub format: bool,
+    // #[arg(long, short)]
+    // pub warn: bool,
+    // #[arg(long, short, help = "Output the results to a file")]
+    // pub output: bool,
 }

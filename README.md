@@ -24,3 +24,26 @@ NOTE: This method is not perfect as there are other ways to import packages. To 
  - Improve check for unused assets
     - Assets path can be assigned to a variable and hence imported but actually never used anywhere in the code
  - Test against Dart/Flutter packages
+
+## Usage
+
+dart-unused [OPTIONS] --path <PATH>
+
+Options:
+  -p, --path <PATH>
+          Path to the Dart project
+
+  -a, --assets
+          Check for unreferenced assets
+
+  -d, --deps
+          Check for unreferenced dependencies
+
+  -l, --labels
+          Check for unused arb file(s) entries
+
+      --loc
+          List items registered in locator but not used
+
+  -h, --help
+          Print help (see a summary with '-h')
