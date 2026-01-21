@@ -28,6 +28,10 @@ NOTE: This method is not perfect as there are other ways to import packages. To 
     - dependencies might just need to move to dev-dependencies, so this might require user input
  - Output as warning instead of erroring
  - Save output to a file
+ - Available as a Github Action
+ - Specify config
+ - Handle flavours
+ - Able to specify entry file
 
 ## Usage
 
@@ -54,6 +58,6 @@ Options:
 
 ## Why Rust
 
-Rust has great libraries for creating custom parsers and is really performant. While developing this and testing it against a Flutter project with over 6100 files, it managed to complete it between 1.1 and 2.2 seconds.
+Rust has great libraries for creating custom parsers and is really performant. While developing this and testing it against a Flutter project with over 6100 files, it managed to complete it in less than 1 second with all the flags enabled.
 
 It would be possible to do the same in Dart using the `Analyzer` package, but the performance would be not great.
