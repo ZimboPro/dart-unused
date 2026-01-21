@@ -3,6 +3,14 @@ name = "dart-unused"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.92.0"
+repository = "https://github.com/ZimboPro/dart-unused"
+authors = ["ZimboPro"]
+
+[package.metadata.wix]
+upgrade-guid = "34B86871-B328-4DBE-AB4A-AFA960CC15C1"
+path-guid = "E1D1F4A0-D2A0-4133-BB41-BCB0F62CE87C"
+license = false
+eula = false
 
 [dependencies]
 anyhow = "1.0.100"
@@ -16,3 +24,8 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 serde_yaml2 = "0.1.3"
 simplelog = "0.12.2"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
