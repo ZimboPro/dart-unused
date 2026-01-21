@@ -242,19 +242,20 @@ fn extract_data(
     }
 
     if args.loc
-        && let Ok((_, r)) = locator::locator(&contents) {
-            for reg in r {
-                match reg {
-                    locator::Locator::Register(s) => {
-                        locators.entry(s).or_insert(false);
-                    }
-                    locator::Locator::Get(s) => {
-                        locators.insert(s, true);
-                    }
-                    _ => {}
+        && let Ok((_, r)) = locator::locator(&contents)
+    {
+        for reg in r {
+            match reg {
+                locator::Locator::Register(s) => {
+                    locators.entry(s).or_insert(false);
                 }
+                locator::Locator::Get(s) => {
+                    locators.insert(s, true);
+                }
+                _ => {}
             }
         }
+    }
 
     Ok(())
 }

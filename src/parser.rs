@@ -6,12 +6,12 @@
 /// Additionally, there are several helper functions used by the parser, such as `quote`, `no_colons_in_input`, and `take_until_quote`.
 /// The module also includes unit tests for the parser functions.
 use nom::{
+    IResult,
     branch::alt,
     bytes::complete::{tag, take_until1},
     character::complete::multispace1,
     combinator::map_res,
     sequence::tuple,
-    IResult,
 };
 
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
@@ -29,9 +29,10 @@ impl TryFrom<&str> for DartFile {
         match dart_file(value) {
             Ok((_, dart)) => {
                 if let DartFile::Import(path) = &dart
-                    && path.contains(":") {
-                        return Err("Package imports are not supported");
-                    }
+                    && path.contains(":")
+                {
+                    return Err("Package imports are not supported");
+                }
                 Ok(dart)
             }
             Err(_) => Err("Failed to parse dart file"),
@@ -45,9 +46,10 @@ impl TryFrom<&DartFile> for DartFile {
     fn try_from(value: &DartFile) -> Result<Self, Self::Error> {
         log::info!("Parsing: {:?}", value);
         if let DartFile::Import(path) = &value
-            && path.contains(":") {
-                return Err("Package imports are not supported");
-            }
+            && path.contains(":")
+        {
+            return Err("Package imports are not supported");
+        }
         Ok(value.clone())
     }
 }

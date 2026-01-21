@@ -1,10 +1,10 @@
 use nom::{
+    IResult,
     branch::alt,
     bytes::complete::{tag, take_till, take_until},
     character::complete::{alphanumeric1, multispace0},
     multi::many0,
     sequence::tuple,
-    IResult,
 };
 use std::sync::OnceLock;
 
