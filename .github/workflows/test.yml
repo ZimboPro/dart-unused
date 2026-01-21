@@ -27,21 +27,21 @@ jobs:
                   components: rustfmt, clippy
 
             - name: Cache cargo registry
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: ~/.cargo/registry/cache
                   key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
                   restore-keys: ${{ runner.os }}-cargo-registry-
 
             - name: Cache cargo index
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: ~/.cargo/registry/index
                   key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
                   restore-keys: ${{ runner.os }}-cargo-index-
 
             - name: Cache target directory
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: target
                   key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
@@ -79,21 +79,21 @@ jobs:
                   toolchain: "1.92.0"
 
             - name: Cache cargo registry
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: ~/.cargo/registry/cache
                   key: ${{ runner.os }}-msrv-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
                   restore-keys: ${{ runner.os }}-msrv-cargo-registry-
 
             - name: Cache cargo index
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: ~/.cargo/registry/index
                   key: ${{ runner.os }}-msrv-cargo-index-${{ hashFiles('**/Cargo.lock') }}
                   restore-keys: ${{ runner.os }}-msrv-cargo-index-
 
             - name: Cache target directory
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: target
                   key: ${{ runner.os }}-msrv-target-${{ hashFiles('**/Cargo.lock') }}
