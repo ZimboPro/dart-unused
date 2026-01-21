@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -10,11 +10,16 @@ use path_dedot::ParseDot;
 pub mod assets;
 pub mod cli;
 pub mod config;
+pub mod localisation;
+pub mod locator;
 pub mod parser;
 pub mod pubspec;
 pub mod util;
 
-use crate::assets::{OsStringWithStr, get_assets, get_registered_assets};
+use crate::{
+    assets::{OsStringWithStr, get_assets, get_registered_assets},
+    localisation::all_localisation,
+};
 
 pub fn get_unreferenced_files() -> anyhow::Result<()> {
     let args = cli::CLI::parse();
@@ -32,8 +37,11 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
     } else {
         Vec::new()
     };
+    let mut labels_referenced: HashSet<String> = HashSet::with_capacity(10_000);
+    let mut locators = HashMap::with_capacity(300);
     let mut referenced_files: HashSet<PathBuf> = HashSet::with_capacity(10_000);
     // TODO allow to set entry point
+    localisation::set_class_name(&pubspec.flutter_intl.class_name)?;
     let main = PathBuf::from("lib/main.dart");
     referenced_files.insert(main.clone());
     extract_data(
@@ -42,6 +50,9 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
         &mut referenced_files,
         &mut deps,
         &mut assets,
+        &mut labels_referenced,
+        &mut locators,
+        &args,
     )?;
 
     let dart = glob("lib/**/*.dart").expect("Failed to read glob pattern");
@@ -67,6 +78,41 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
         log::info!("");
     }
 
+    if args.labels {
+        // read arb files to get all localisation keys
+        let mut all_localisation_keys: HashSet<String> = HashSet::with_capacity(10_000);
+        let arb_files = glob("lib/l10n/*.arb").expect("Failed to read glob pattern");
+        for arb in arb_files.flatten() {
+            let contents = std::fs::read_to_string(&arb).expect("Failed to read arb file");
+            let json: serde_json::Value =
+                serde_json::from_str(&contents).expect("Failed to parse arb file");
+            if let serde_json::Value::Object(map) = json {
+                for (key, _) in map.iter() {
+                    all_localisation_keys.insert(key.to_owned());
+                }
+            }
+        }
+
+        all_localisation_keys.retain(|x| !labels_referenced.contains(x));
+
+        for label in all_localisation_keys.iter().enumerate() {
+            log::error!(
+                "{}. Unreferenced localisation key: {:?}",
+                label.0 + 1,
+                label.1
+            );
+        }
+        log::info!("");
+    }
+
+    if args.loc {
+        locators.retain(|_, v| !*v);
+        for (ind, (k, _)) in locators.iter().enumerate() {
+            log::error!("{}. Unused locator: {:?}", ind + 1, k);
+        }
+        log::info!("");
+    }
+
     for file in dart.iter().enumerate() {
         log::error!("{} Unreferenced file: {:?}", file.0 + 1, file.1);
     }
@@ -79,6 +125,9 @@ fn extract_data(
     referenced_files: &mut HashSet<PathBuf>,
     deps: &mut Vec<String>,
     assets: &mut Vec<OsStringWithStr>,
+    labels: &mut HashSet<String>,
+    locators: &mut HashMap<String, bool>,
+    args: &cli::CLI,
 ) -> anyhow::Result<()> {
     let contents = std::fs::read_to_string(&file_path).expect("Failed to read file");
     for line in contents.lines() {
@@ -97,6 +146,9 @@ fn extract_data(
                             referenced_files,
                             deps,
                             assets,
+                            labels,
+                            locators,
+                            args,
                         )?;
                     }
                 }
@@ -114,6 +166,9 @@ fn extract_data(
                                 referenced_files,
                                 deps,
                                 assets,
+                                labels,
+                                locators,
+                                args,
                             )?;
                         }
                     } else {
@@ -140,6 +195,9 @@ fn extract_data(
                             referenced_files,
                             deps,
                             assets,
+                            labels,
+                            locators,
+                            args,
                         )?;
                     }
                 }
@@ -173,5 +231,33 @@ fn extract_data(
     if remove {
         deps.retain(|dep| !used_deps.contains(dep));
     }
+
+    if args.labels {
+        let s = all_localisation(&contents);
+        if let Ok((_, keys)) = s {
+            for key in keys {
+                labels.insert(key.to_owned());
+            }
+        }
+    }
+
+    if args.loc {
+        if let Ok((_, r)) = locator::locator(&contents) {
+            for reg in r {
+                match reg {
+                    locator::Locator::Register(s) => {
+                        if !locators.contains_key(&s) {
+                            locators.insert(s, false);
+                        }
+                    }
+                    locator::Locator::Get(s) => {
+                        locators.insert(s, true);
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
     Ok(())
 }
