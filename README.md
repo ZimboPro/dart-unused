@@ -51,3 +51,9 @@ Options:
 
   -h, --help
           Print help (see a summary with '-h')
+
+## Why Rust
+
+Rust has great libraries for creating custom parsers and is really performant. While developing this and testing it against a Flutter project with over 6100 files, it managed to complete it between 1.1 and 2.2 seconds.
+
+It would be possible to do the same in Dart using the `Analyzer` package, but the performance would be not great.
