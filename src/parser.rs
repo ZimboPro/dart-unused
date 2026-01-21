@@ -6,12 +6,11 @@
 /// Additionally, there are several helper functions used by the parser, such as `quote`, `no_colons_in_input`, and `take_until_quote`.
 /// The module also includes unit tests for the parser functions.
 use nom::{
-    IResult,
+    IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take_until1},
     character::complete::multispace1,
     combinator::map_res,
-    sequence::tuple,
 };
 
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
@@ -56,7 +55,7 @@ impl TryFrom<&DartFile> for DartFile {
 
 /// Parses a single or multiple quotes (either single or double quotes).
 fn quote(input: &str) -> IResult<&str, &str> {
-    alt((tag("'"), tag("\"")))(input)
+    alt((tag("'"), tag("\""))).parse(input)
 }
 
 /// Checks if the input string contains a colon.
@@ -73,7 +72,7 @@ fn no_colons_in_input(input: &str) -> IResult<&str, &str> {
 /// Parses an import statement and returns a `DartFile::Import` variant.
 fn import_parser(input: &str) -> IResult<&str, DartFile> {
     let (remaining, (_, _, _, path)) =
-        tuple((tag("import"), multispace1, quote, take_until_quote))(input)?;
+        (tag("import"), multispace1, quote, take_until_quote).parse(input)?;
     no_colons_in_input(path)?;
 
     Ok((remaining, DartFile::Import(path.to_string())))
@@ -83,13 +82,13 @@ fn import_parser(input: &str) -> IResult<&str, DartFile> {
 fn import(input: &str) -> IResult<&str, DartFile> {
     let mut parser = map_res(import_parser, DartFile::try_from);
 
-    parser(input)
+    parser.parse(input)
 }
 
 /// Parses an export statement and returns a `DartFile::Export` variant.
 fn export_parser(input: &str) -> IResult<&str, DartFile> {
     let (remaining, (_, _, _, path)) =
-        tuple((tag("export"), multispace1, quote, take_until_quote))(input)?;
+        (tag("export"), multispace1, quote, take_until_quote).parse(input)?;
     no_colons_in_input(path)?;
 
     Ok((remaining, DartFile::Export(path.to_string())))
@@ -102,14 +101,15 @@ fn export(input: &str) -> IResult<&str, DartFile> {
 
 /// Parses a package statement and returns a `DartFile::Package` variant.
 fn package(input: &str) -> IResult<&str, DartFile> {
-    let (remaining, (_, _, _, _, name, path)) = tuple((
+    let (remaining, (_, _, _, _, name, path)) = (
         tag("import"),
         multispace1,
         quote,
         tag("package:"),
         take_until1("/"),
         take_until_quote,
-    ))(input)?;
+    )
+        .parse(input)?;
     Ok((
         remaining,
         DartFile::Package(name.to_string(), path.to_string()),
@@ -119,7 +119,7 @@ fn package(input: &str) -> IResult<&str, DartFile> {
 /// Parses a part statement and returns a `DartFile::Part` variant.
 fn part(input: &str) -> IResult<&str, DartFile> {
     let (remaining, (_, _, _, value)) =
-        tuple((tag("part"), multispace1, quote, take_until_quote))(input)?;
+        (tag("part"), multispace1, quote, take_until_quote).parse(input)?;
 
     Ok((remaining, DartFile::Part(value.to_string())))
 }
@@ -170,12 +170,12 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// assert_eq!(result, Ok(("';", expected)));
 /// ```
 pub fn dart_file(input: &str) -> IResult<&str, DartFile> {
-    alt((package, import, part, export))(input)
+    alt((package, import, part, export)).parse(input)
 }
 
 /// Parses a string until a quote is encountered (either single or double quotes).
 fn take_until_quote(input: &str) -> IResult<&str, &str> {
-    alt((take_until1("'"), take_until1("\"")))(input)
+    alt((take_until1("'"), take_until1("\""))).parse(input)
 }
 
 #[cfg(test)]

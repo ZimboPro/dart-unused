@@ -1,10 +1,9 @@
 use nom::{
-    IResult,
+    IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take_till, take_until},
     character::complete::{alphanumeric1, multispace0},
     multi::many0,
-    sequence::tuple,
 };
 use std::sync::OnceLock;
 
@@ -22,12 +21,12 @@ pub fn set_class_name(class_name: &str) -> anyhow::Result<()> {
 
 /// Parse all localisation keys from a string
 pub fn all_localisation(input: &str) -> IResult<&str, Vec<&str>> {
-    many0(localisation)(input)
+    many0(localisation).parse(input)
 }
 
 /// Parse a single localisation key from a string
 pub fn localisation(input: &str) -> IResult<&str, &str> {
-    let (remaining, (_, _, _, _, _, _, _, _, key)) = tuple((
+    let (remaining, (_, _, _, _, _, _, _, _, key)) = (
         take_until(INSTANCE.get().unwrap().as_str()),
         tag(INSTANCE.get().unwrap().as_str()),
         multispace0,
@@ -37,29 +36,32 @@ pub fn localisation(input: &str) -> IResult<&str, &str> {
         multispace0,
         tag("."),
         is_alphanumeric_or_underscore,
-    ))(input)?;
+    )
+        .parse(input)?;
     Ok((remaining, key))
 }
 
 fn of_context(input: &str) -> IResult<&str, &str> {
-    let (remaining, _s) = tuple((
+    let (remaining, _s) = (
         multispace0,
         tag("of("),
         alphanumeric1, // Generally 'context' but not guaranteed
         tag(")"),
-    ))(input)?;
+    )
+        .parse(input)?;
     Ok((remaining, ""))
 }
 
 fn maybe_of(input: &str) -> IResult<&str, &str> {
-    let (remaining, _s) = tuple((
+    let (remaining, _s) = (
         multispace0,
         tag("maybeOf("),
         alphanumeric1, // Generally 'context' but not guaranteed
         tag(")"),
         multispace0,
         tag("?"),
-    ))(input)?;
+    )
+        .parse(input)?;
     Ok((remaining, ""))
 }
 
