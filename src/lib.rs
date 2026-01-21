@@ -129,7 +129,7 @@ fn extract_data(
     locators: &mut HashMap<String, bool>,
     args: &cli::CLI,
 ) -> anyhow::Result<()> {
-    let contents = std::fs::read_to_string(&file_path).expect("Failed to read file");
+    let contents = std::fs::read_to_string(file_path).expect("Failed to read file");
     for line in contents.lines() {
         if let Ok((_, dart)) = parser::dart_file(line) {
             match dart {
@@ -241,14 +241,12 @@ fn extract_data(
         }
     }
 
-    if args.loc {
-        if let Ok((_, r)) = locator::locator(&contents) {
+    if args.loc
+        && let Ok((_, r)) = locator::locator(&contents) {
             for reg in r {
                 match reg {
                     locator::Locator::Register(s) => {
-                        if !locators.contains_key(&s) {
-                            locators.insert(s, false);
-                        }
+                        locators.entry(s).or_insert(false);
                     }
                     locator::Locator::Get(s) => {
                         locators.insert(s, true);
@@ -257,7 +255,6 @@ fn extract_data(
                 }
             }
         }
-    }
 
     Ok(())
 }

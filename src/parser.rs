@@ -28,12 +28,11 @@ impl TryFrom<&str> for DartFile {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match dart_file(value) {
             Ok((_, dart)) => {
-                if let DartFile::Import(path) = &dart {
-                    if path.contains(":") {
+                if let DartFile::Import(path) = &dart
+                    && path.contains(":") {
                         return Err("Package imports are not supported");
                     }
-                }
-                return Ok(dart);
+                Ok(dart)
             }
             Err(_) => Err("Failed to parse dart file"),
         }
@@ -45,12 +44,11 @@ impl TryFrom<&DartFile> for DartFile {
 
     fn try_from(value: &DartFile) -> Result<Self, Self::Error> {
         log::info!("Parsing: {:?}", value);
-        if let DartFile::Import(path) = &value {
-            if path.contains(":") {
+        if let DartFile::Import(path) = &value
+            && path.contains(":") {
                 return Err("Package imports are not supported");
             }
-        }
-        return Ok(value.clone());
+        Ok(value.clone())
     }
 }
 

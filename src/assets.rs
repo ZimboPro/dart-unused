@@ -19,15 +19,15 @@ pub fn get_assets(
     ignored_assets: &Vec<String>,
 ) -> anyhow::Result<Vec<OsStringWithStr>> {
     if enabled {
-        let registered_assets = get_registered_assets(&asset_paths)?;
-        let registered_assets = remove_ignored_assets(registered_assets, &ignored_assets)?;
+        let registered_assets = get_registered_assets(asset_paths)?;
+        let registered_assets = remove_ignored_assets(registered_assets, ignored_assets)?;
         let mut assets = Vec::with_capacity(registered_assets.len());
         for asset in registered_assets.iter() {
             let p = asset.file_name().unwrap().to_owned();
 
             let v = OsStringWithStrBuilder {
                 os: p,
-                s_builder: |os| &os.to_str().unwrap(),
+                s_builder: |os| os.to_str().unwrap(),
             }
             .build();
             assets.push(v);
