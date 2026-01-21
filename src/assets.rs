@@ -13,7 +13,7 @@ pub(super) struct OsStringWithStr {
     pub(super) s: &'this str,
 }
 
-pub fn get_assets(
+pub(crate) fn get_assets(
     enabled: bool,
     asset_paths: &Vec<PathBuf>,
     ignored_assets: &Vec<String>,
