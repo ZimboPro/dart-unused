@@ -3,12 +3,12 @@
 /// This module defines a `Locator` enum to represent different types of locators
 /// and provides functions to parse these locators from a given input string.
 use nom::{
-    IResult,
+    IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take_until},
     character::complete::multispace0,
     multi::many0,
-    sequence::{delimited, tuple},
+    sequence::delimited,
 };
 
 use crate::localisation::is_alphanumeric_or_underscore;
@@ -22,35 +22,37 @@ pub enum Locator {
 
 /// Parser to extract the class being registered and used the GetIt dart locator package using nom
 fn register_locator(input: &str) -> IResult<&str, Locator> {
-    let (rest, (_, _, _, class)) = tuple((
+    let (rest, (_, _, _, class)) = (
         multispace0,
         tag("register"),
         take_until("<"),
         delimited(tag("<"), is_alphanumeric_or_underscore, tag(">")),
-    ))(input)?;
+    )
+        .parse(input)?;
     Ok((rest, Locator::Register(class.to_string())))
 }
 
 fn find_locator(input: &str) -> IResult<&str, ()> {
-    let (r, _) = tuple((take_until("locator."), tag("locator.")))(input)?;
+    let (r, _) = (take_until("locator."), tag("locator.")).parse(input)?;
     Ok((r, ()))
 }
 
 fn find_locator_alt(input: &str) -> IResult<&str, ()> {
-    let (r, _) = tuple((take_until("locator<"), tag("locator<")))(input)?;
+    let (r, _) = (take_until("locator<"), tag("locator<")).parse(input)?;
     Ok((r, ()))
 }
 
 fn get_locator(input: &str) -> IResult<&str, Locator> {
-    let (s, (_, l)) = tuple((find_locator, alt((import, register_locator, get, get_alt))))(input)?;
+    let (s, (_, l)) = (find_locator, alt((import, register_locator, get, get_alt))).parse(input)?;
     Ok((s, l))
 }
 
 fn get_locator_alt(input: &str) -> IResult<&str, Locator> {
-    let (s, (_, l)) = tuple((
+    let (s, (_, l)) = (
         find_locator_alt,
         alt((import, register_locator, get, get_alt)),
-    ))(input)?;
+    )
+        .parse(input)?;
     Ok((s, l))
 }
 
@@ -66,8 +68,8 @@ fn import(input: &str) -> IResult<&str, Locator> {
 /// - `locator.get<GetIt>();`
 /// - `locator<GetIt>();`
 pub fn locator(input: &str) -> IResult<&str, Vec<Locator>> {
-    let (r1, l) = many0(get_locator)(input)?;
-    let (r2, x) = many0(get_locator_alt)(input)?;
+    let (r1, l) = many0(get_locator).parse(input)?;
+    let (r2, x) = many0(get_locator_alt).parse(input)?;
     let mut s = l;
     s.extend(x);
     if r1.len() > r2.len() {
@@ -78,17 +80,18 @@ pub fn locator(input: &str) -> IResult<&str, Vec<Locator>> {
 }
 
 fn get(input: &str) -> IResult<&str, Locator> {
-    let (remaining, (_, _, _, class)) = tuple((
+    let (remaining, (_, _, _, class)) = (
         multispace0,
         tag("get"),
         take_until("<"),
         delimited(tag("<"), is_alphanumeric_or_underscore, tag(">")),
-    ))(input)?;
+    )
+        .parse(input)?;
     Ok((remaining, Locator::Get(class.to_string())))
 }
 
 fn get_alt(input: &str) -> IResult<&str, Locator> {
-    let (remaining, (_, class)) = tuple((multispace0, take_until(">")))(input)?;
+    let (remaining, (_, class)) = (multispace0, take_until(">")).parse(input)?;
     Ok((remaining, Locator::Get(class.to_string())))
 }
 

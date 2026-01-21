@@ -1,0 +1,9 @@
+format_ignore:
+    - "lib/**/*.g.dart"
+    - "lib/**/*.freezed.dart"
+assets:
+    ignore:
+        - "assets/local_data/**/*.*"
+deps:
+    ignore:
+        - intl_utils
