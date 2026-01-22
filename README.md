@@ -41,6 +41,9 @@ Options:
   -p, --path <PATH>
           Path to the Dart project
 
+      --remove
+          Remove all unreferenced items discovered
+
   -a, --assets
           Check for unreferenced assets
 
@@ -53,11 +56,14 @@ Options:
       --loc
           List items registered in locator but not used
 
+  -v, --verbose
+          Enable verbose logging
+
   -h, --help
           Print help (see a summary with '-h')
 
 ## Why Rust
 
-Rust has great libraries for creating custom parsers and is really performant. While developing this and testing it against a Flutter project with over 6100 files, it managed to complete it in less than 1 second with all the flags enabled.
+Rust has great libraries for creating custom parsers and is really performant. While developing this and testing it against a Flutter project with over 6100 files, it managed to complete it in just over a 1 second with all the flags enabled except remove.
 
 It would be possible to do the same in Dart using the `Analyzer` package, but the performance would be not great.
