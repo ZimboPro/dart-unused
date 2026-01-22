@@ -37,15 +37,15 @@ pub struct Args {
     // pub output: bool,
 }
 
-impl Into<Options> for Args {
-    fn into(self) -> Options {
-        Options {
-            assets: self.assets,
-            deps: self.deps,
-            labels: self.labels,
-            loc: self.loc,
-            path: self.path,
-            remove: self.remove,
+impl From<Args> for Options {
+    fn from(val: Args) -> Self {
+        Self {
+            assets: val.assets,
+            deps: val.deps,
+            labels: val.labels,
+            loc: val.loc,
+            path: val.path,
+            remove: val.remove,
         }
     }
 }

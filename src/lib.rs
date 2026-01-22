@@ -47,10 +47,8 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     util::set_current_dir(&args.path)?;
     let pubspec = pubspec::get_package_details()?;
     let mut assets = get_assets(args.assets, &pubspec.flutter.assets, &config.assets.ignore)?;
-    let registered_assets: HashSet<PathBuf> = assets
-        .iter()
-        .map(|x| x.borrow_path().clone().into())
-        .collect();
+    let registered_assets: HashSet<PathBuf> =
+        assets.iter().map(|x| x.borrow_path().clone()).collect();
     info!("{} assets registered", assets.len());
     let mut deps: Vec<String> = if args.deps {
         pubspec.dependencies.keys().cloned().collect()
@@ -78,7 +76,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     if !assets.is_empty() {
         let assets: Vec<PathBuf> = assets
             .into_iter()
-            .map(|x| x.borrow_path().to_owned().into())
+            .map(|x| x.borrow_path().to_owned())
             .collect();
         for asset in assets.iter().enumerate() {
             log::error!(
