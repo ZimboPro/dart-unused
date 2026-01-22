@@ -3,8 +3,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::Parser;
 use glob::glob;
+use log::info;
 use path_dedot::ParseDot;
 
 pub mod assets;
@@ -17,7 +17,7 @@ pub mod pubspec;
 pub mod util;
 
 use crate::{
-    assets::{OsStringWithStr, get_assets, get_registered_assets},
+    assets::{OsStringWithStr, get_all_items_in_asset_dir, get_assets},
     localisation::all_localisation,
 };
 
@@ -37,8 +37,7 @@ impl ExtractData {
     }
 }
 
-pub fn get_unreferenced_files() -> anyhow::Result<()> {
-    let args = cli::CLI::parse();
+pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     let config: config::Config = if let Ok(s) = std::fs::read_to_string("unused.config.yaml") {
         serde_yaml2::from_str(&s).unwrap()
     } else {
@@ -48,6 +47,9 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
     util::set_current_dir(&args.path)?;
     let pubspec = pubspec::get_package_details()?;
     let mut assets = get_assets(args.assets, &pubspec.flutter.assets, &config.assets.ignore)?;
+    let registered_assets: HashSet<PathBuf> =
+        assets.iter().map(|x| x.borrow_path().clone()).collect();
+    info!("{} assets registered", assets.len());
     let mut deps: Vec<String> = if args.deps {
         pubspec.dependencies.keys().cloned().collect()
     } else {
@@ -72,17 +74,33 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
     let mut dart: Vec<PathBuf> = dart.flatten().collect();
     dart.retain(|path| !extracted_data.referenced_files.contains(path));
     if !assets.is_empty() {
-        let assets: HashSet<PathBuf> = assets
+        let assets: Vec<PathBuf> = assets
             .into_iter()
-            .map(|x| x.borrow_os().clone().into())
+            .map(|x| x.borrow_path().to_owned())
             .collect();
-        let mut all_assets = get_registered_assets(&pubspec.flutter.assets)?;
-        all_assets.retain(|x| assets.contains(x));
-
-        for asset in all_assets.iter().enumerate() {
-            log::error!("{}. Unreferenced asset: {:?}", asset.0 + 1, asset.1);
+        for asset in assets.iter().enumerate() {
+            log::error!(
+                "{}. Unreferenced registered assets: {:?}",
+                asset.0 + 1,
+                asset.1
+            );
         }
         log::info!("");
+        let mut all_assets =
+            get_all_items_in_asset_dir(&pubspec.flutter.assets, &config.assets.ignore)?;
+        all_assets.retain(|x| !registered_assets.contains(x));
+
+        if !all_assets.is_empty() {
+            for asset in all_assets.iter().enumerate() {
+                log::error!("{}. Unregistered asset: {:?}", asset.0 + 1, asset.1);
+            }
+            log::info!("");
+        }
+        if args.remove {
+            for asset in all_assets.iter() {
+                std::fs::remove_file(asset)?;
+            }
+        }
     }
     if args.deps {
         for dep in deps.iter().enumerate() {
@@ -129,6 +147,11 @@ pub fn get_unreferenced_files() -> anyhow::Result<()> {
     for file in dart.iter().enumerate() {
         log::error!("{} Unreferenced file: {:?}", file.0 + 1, file.1);
     }
+    if args.remove {
+        for file in dart.iter() {
+            std::fs::remove_file(file)?;
+        }
+    }
     Ok(())
 }
 
@@ -138,7 +161,7 @@ fn extract_data(
     extracted_data: &mut ExtractData,
     deps: &mut Vec<String>,
     assets: &mut Vec<OsStringWithStr>,
-    args: &cli::CLI,
+    args: &cli::Options,
 ) -> anyhow::Result<()> {
     let contents = std::fs::read_to_string(file_path).expect("Failed to read file");
     for line in contents.lines() {
@@ -226,14 +249,14 @@ fn extract_data(
     let mut remove = false;
     let mut referenced_asset_files = HashSet::with_capacity(10);
     for asset in assets.iter() {
-        if contents.contains(asset.borrow_s()) {
+        if contents.contains(asset.borrow_file_name()) {
             remove = true;
-            referenced_asset_files.insert(asset.borrow_os().clone());
+            referenced_asset_files.insert(asset.borrow_path().clone());
         }
     }
     // Remove referenced assets from the set to speed up future checks
     if remove {
-        assets.retain(|asset| !referenced_asset_files.contains(asset.borrow_os()));
+        assets.retain(|asset| !referenced_asset_files.contains(asset.borrow_path()));
     }
 
     remove = false;

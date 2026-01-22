@@ -2,15 +2,16 @@ use std::{collections::HashSet, path::PathBuf};
 
 use glob::glob;
 
+use log::{debug, info, warn};
 use ouroboros::self_referencing;
 
 #[self_referencing]
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct OsStringWithStr {
-    pub(super) os: std::ffi::OsString,
+    pub(super) path: PathBuf,
 
-    #[borrows(os)]
-    pub(super) s: &'this str,
+    #[borrows(path)]
+    pub(super) file_name: &'this str,
 }
 
 pub(crate) fn get_assets(
@@ -19,21 +20,26 @@ pub(crate) fn get_assets(
     ignored_assets: &Vec<String>,
 ) -> anyhow::Result<Vec<OsStringWithStr>> {
     if enabled {
+        info!("Finding registered assets");
         let registered_assets = get_registered_assets(asset_paths)?;
+        debug!("{} registered assets", registered_assets.len());
         let registered_assets = remove_ignored_assets(registered_assets, ignored_assets)?;
+        debug!(
+            "{} registered assets after removing ignored assets",
+            registered_assets.len()
+        );
         let mut assets = Vec::with_capacity(registered_assets.len());
         for asset in registered_assets.iter() {
-            let p = asset.file_name().unwrap().to_owned();
-
             let v = OsStringWithStrBuilder {
-                os: p,
-                s_builder: |os| os.to_str().unwrap(),
+                path: asset.clone(),
+                file_name_builder: |path| path.file_name().unwrap().to_str().unwrap(),
             }
             .build();
             assets.push(v);
         }
         Ok(assets)
     } else {
+        info!("Ignoring assets");
         Ok(Vec::new())
     }
 }
@@ -41,12 +47,13 @@ pub(crate) fn get_assets(
 pub fn get_registered_assets(asset_paths: &Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
     let mut assets: HashSet<PathBuf> = HashSet::new();
     for asset in asset_paths {
+        debug!("Looking in {:?}", asset);
         let path = PathBuf::from(asset);
         if path.exists() {
             if path.is_file() {
                 assets.insert(path);
             } else if path.is_dir() {
-                let pattern = format!("{}/**", asset.to_str().unwrap());
+                let pattern = format!("{}/*", asset.to_str().unwrap());
                 let items = glob(&pattern)
                     .expect("Failed to read glob pattern")
                     .flatten()
@@ -56,13 +63,18 @@ pub fn get_registered_assets(asset_paths: &Vec<PathBuf>) -> anyhow::Result<Vec<P
                         assets.insert(entry);
                     }
                 }
+            } else {
+                warn!("Path {:?} does not exist", asset);
             }
         }
     }
     Ok(assets.into_iter().collect())
 }
 
-pub fn get_all_items_in_asset_dir(asset_paths: &Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {
+pub fn get_all_items_in_asset_dir(
+    asset_paths: &Vec<PathBuf>,
+    ignored_assets: &Vec<String>,
+) -> anyhow::Result<Vec<PathBuf>> {
     let mut assets: HashSet<PathBuf> = HashSet::new();
     for asset in asset_paths {
         let path = PathBuf::from(asset);
@@ -83,7 +95,8 @@ pub fn get_all_items_in_asset_dir(asset_paths: &Vec<PathBuf>) -> anyhow::Result<
             }
         }
     }
-    Ok(assets.into_iter().collect())
+    let assets = remove_ignored_assets(assets.into_iter().collect(), ignored_assets)?;
+    Ok(assets)
 }
 
 pub fn remove_ignored_assets(
