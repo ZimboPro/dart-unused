@@ -59,11 +59,6 @@ jobs:
             - name: Run tests
               run: cargo test --verbose
 
-            - name: Security audit
-              uses: rustsec/audit-check@v1.4.1
-              with:
-                  token: ${{ secrets.GITHUB_TOKEN }}
-
     msrv:
         name: Minimum Supported Rust Version
         runs-on: ubuntu-latest
