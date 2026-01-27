@@ -1,8 +1,10 @@
 use dart_unused::{cli::Options, get_unreferenced_files};
 use log::LevelFilter;
-use simplelog::{ColorChoice, ConfigBuilder, TermLogger, TerminalMode};
+use simplelog::{
+    ColorChoice, CombinedLogger, Config, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
+};
 
-use std::path::PathBuf;
+use std::{fs::File, path::PathBuf};
 
 use clap::Parser;
 
@@ -33,8 +35,8 @@ pub struct Args {
     // pub format: bool,
     // #[arg(long, short)]
     // pub warn: bool,
-    // #[arg(long, short, help = "Output the results to a file")]
-    // pub output: bool,
+    #[arg(short, long, short, help = "Output the results to a file")]
+    pub output: bool,
 }
 
 impl From<Args> for Options {
@@ -60,7 +62,18 @@ fn main() -> anyhow::Result<()> {
     } else {
         LevelFilter::Info
     };
+    if args.output {
+        CombinedLogger::init(vec![
+            TermLogger::new(log_level, config, TerminalMode::Mixed, ColorChoice::Auto),
+            WriteLogger::new(
+                log_level,
+                Config::default(),
+                File::create("dart-unused.log").unwrap(),
+            ),
+        ])?;
+    } else {
+        TermLogger::init(log_level, config, TerminalMode::Mixed, ColorChoice::Auto)?;
+    }
 
-    TermLogger::init(log_level, config, TerminalMode::Mixed, ColorChoice::Auto)?;
     get_unreferenced_files(args.into())
 }
