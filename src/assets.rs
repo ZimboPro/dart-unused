@@ -15,33 +15,26 @@ pub(super) struct OsStringWithStr {
 }
 
 pub(crate) fn get_assets(
-    enabled: bool,
-    asset_paths: &Vec<PathBuf>,
+    registered_assets: Vec<PathBuf>,
     ignored_assets: &Vec<String>,
 ) -> anyhow::Result<Vec<OsStringWithStr>> {
-    if enabled {
-        info!("Finding registered assets");
-        let registered_assets = get_registered_assets(asset_paths)?;
-        debug!("{} registered assets", registered_assets.len());
-        let registered_assets = remove_ignored_assets(registered_assets, ignored_assets)?;
-        debug!(
-            "{} registered assets after removing ignored assets",
-            registered_assets.len()
-        );
-        let mut assets = Vec::with_capacity(registered_assets.len());
-        for asset in registered_assets.iter() {
-            let v = OsStringWithStrBuilder {
-                path: asset.clone(),
-                file_name_builder: |path| path.file_name().unwrap().to_str().unwrap(),
-            }
-            .build();
-            assets.push(v);
+    info!("Finding registered assets");
+    debug!("{} registered assets", registered_assets.len());
+    let registered_assets = remove_ignored_assets(registered_assets, ignored_assets)?;
+    debug!(
+        "{} registered assets after removing ignored assets",
+        registered_assets.len()
+    );
+    let mut assets = Vec::with_capacity(registered_assets.len());
+    for asset in registered_assets.iter() {
+        let v = OsStringWithStrBuilder {
+            path: asset.clone(),
+            file_name_builder: |path| path.file_name().unwrap().to_str().unwrap(),
         }
-        Ok(assets)
-    } else {
-        info!("Ignoring assets");
-        Ok(Vec::new())
+        .build();
+        assets.push(v);
     }
+    Ok(assets)
 }
 
 pub fn get_registered_assets(asset_paths: &Vec<PathBuf>) -> anyhow::Result<Vec<PathBuf>> {

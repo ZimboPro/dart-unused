@@ -44,9 +44,16 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
         Default::default()
     };
 
+    info!("Analyzing project at {:?}", args.path);
     util::set_current_dir(&args.path)?;
+    info!("Current directory set to {:?}", std::env::current_dir()?);
     let pubspec = pubspec::get_package_details()?;
-    let mut assets = get_assets(args.assets, &pubspec.flutter.assets, &config.assets.ignore)?;
+    let mut assets = if args.assets {
+        get_assets(pubspec.flutter.get_assets(), &config.assets.ignore)?
+    } else {
+        Vec::new()
+    };
+
     let registered_assets: HashSet<PathBuf> =
         assets.iter().map(|x| x.borrow_path().clone()).collect();
     info!("{} assets registered", assets.len());
@@ -86,8 +93,9 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
             );
         }
         log::info!("");
-        let mut all_assets =
-            get_all_items_in_asset_dir(&pubspec.flutter.assets, &config.assets.ignore)?;
+        let mut all_assets: Vec<PathBuf> =
+            get_all_items_in_asset_dir(&pubspec.flutter.get_asset_paths(), &config.assets.ignore)?;
+
         all_assets.retain(|x| !registered_assets.contains(x));
 
         if !all_assets.is_empty() {
@@ -163,7 +171,8 @@ fn extract_data(
     assets: &mut Vec<OsStringWithStr>,
     args: &cli::Options,
 ) -> anyhow::Result<()> {
-    let contents = std::fs::read_to_string(file_path).expect("Failed to read file");
+    let contents = std::fs::read_to_string(file_path)
+        .expect(format!("Failed to read file: {:?}", file_path).as_str());
     for line in contents.lines() {
         if let Ok((_, dart)) = parser::dart_file(line) {
             match dart {
