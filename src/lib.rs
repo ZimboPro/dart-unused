@@ -172,7 +172,7 @@ fn extract_data(
     args: &cli::Options,
 ) -> anyhow::Result<()> {
     let contents = std::fs::read_to_string(file_path)
-        .expect(format!("Failed to read file: {:?}", file_path).as_str());
+        .unwrap_or_else(|_| panic!("Failed to read file: {:?}", file_path));
     for line in contents.lines() {
         if let Ok((_, dart)) = parser::dart_file(line) {
             match dart {
