@@ -28,7 +28,7 @@ impl Eq for AssetItem {}
 
 impl PartialOrd for AssetItem {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.path.cmp(&other.path))
+        Some(self.cmp(other))
     }
 }
 

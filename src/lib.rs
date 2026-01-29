@@ -66,7 +66,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     // let mut assets_set: dashmap::DashSet<AssetItem> =
     //     dashmap::DashSet::from_iter(assets.into_iter());
     let mut assets_set: papaya::HashSet<AssetItem, RandomState> =
-        papaya::HashSet::from_iter(assets.into_iter());
+        papaya::HashSet::from_iter(assets);
 
     let locator: papaya::HashMap<String, bool> = papaya::HashMap::with_capacity(dart.len() / 10);
     let labels: papaya::HashSet<String> = papaya::HashSet::with_capacity(dart.len() / 10);
@@ -270,7 +270,7 @@ fn extract_single_file(
     if args.labels {
         let s = all_localisation(&contents);
         if let Ok((_, keys)) = s {
-            let mut labels_referenced = labels.pin();
+            let labels_referenced = labels.pin();
             for key in keys {
                 labels_referenced.insert(key.to_owned());
             }
@@ -280,7 +280,7 @@ fn extract_single_file(
     if args.loc
         && let Ok((_, r)) = locator::locator(&contents)
     {
-        let mut locators = locator.pin();
+        let locators = locator.pin();
         for reg in r {
             match reg {
                 locator::Locator::Register(s) => {
