@@ -1,23 +1,55 @@
+use glob::glob;
+use std::hash::Hash;
 use std::{collections::HashSet, path::PathBuf};
 
-use glob::glob;
-
 use log::{debug, info, warn};
-use ouroboros::self_referencing;
+use regex::Regex;
 
-#[self_referencing]
-#[derive(Debug, PartialEq, Eq)]
-pub(super) struct OsStringWithStr {
+#[derive(Debug, Clone)]
+pub(super) struct AssetItem {
     pub(super) path: PathBuf,
 
-    #[borrows(path)]
-    pub(super) file_name: &'this str,
+    pub(super) file_name: Regex,
+}
+
+impl PartialEq for AssetItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+    }
+}
+
+impl Hash for AssetItem {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.path.hash(state);
+    }
+}
+
+impl Eq for AssetItem {}
+
+impl PartialOrd for AssetItem {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.path.cmp(&other.path))
+    }
+}
+
+impl Ord for AssetItem {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.path.cmp(&other.path)
+    }
+}
+
+impl AssetItem {
+    pub(super) fn new(path: PathBuf) -> Self {
+        let file_name_str = path.file_name().unwrap().to_str().unwrap();
+        let file_name = Regex::new(&format!(r"\b({})\b", file_name_str)).unwrap();
+        AssetItem { path, file_name }
+    }
 }
 
 pub(crate) fn get_assets(
     registered_assets: Vec<PathBuf>,
     ignored_assets: &Vec<String>,
-) -> anyhow::Result<Vec<OsStringWithStr>> {
+) -> anyhow::Result<Vec<AssetItem>> {
     info!("Finding registered assets");
     debug!("{} registered assets", registered_assets.len());
     let registered_assets = remove_ignored_assets(registered_assets, ignored_assets)?;
@@ -27,11 +59,7 @@ pub(crate) fn get_assets(
     );
     let mut assets = Vec::with_capacity(registered_assets.len());
     for asset in registered_assets.iter() {
-        let v = OsStringWithStrBuilder {
-            path: asset.clone(),
-            file_name_builder: |path| path.file_name().unwrap().to_str().unwrap(),
-        }
-        .build();
+        let v = AssetItem::new(asset.clone());
         assets.push(v);
     }
     Ok(assets)
