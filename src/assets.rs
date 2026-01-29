@@ -3,13 +3,12 @@ use std::hash::Hash;
 use std::{collections::HashSet, path::PathBuf};
 
 use log::{debug, info, warn};
-use regex::Regex;
 
 #[derive(Debug, Clone)]
 pub(super) struct AssetItem {
     pub(super) path: PathBuf,
 
-    pub(super) file_name: Regex,
+    pub(super) file_name: String,
 }
 
 impl PartialEq for AssetItem {
@@ -40,8 +39,7 @@ impl Ord for AssetItem {
 
 impl AssetItem {
     pub(super) fn new(path: PathBuf) -> Self {
-        let file_name_str = path.file_name().unwrap().to_str().unwrap();
-        let file_name = Regex::new(&format!(r"\b({})\b", file_name_str)).unwrap();
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
         AssetItem { path, file_name }
     }
 }

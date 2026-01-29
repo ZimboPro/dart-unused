@@ -248,9 +248,17 @@ fn extract_single_file(
 
     let mut assets = assets.pin();
     // First, collect all assets that match the content
+    let bytes = contents.as_bytes();
     assets.iter().for_each(|asset| {
-        if asset.file_name.is_match(&contents) {
-            referenced_asset_files.insert(asset.clone());
+        let len = asset.file_name.len();
+        for ind in memchr::memmem::find_iter(bytes, asset.file_name.as_bytes()) {
+            if ind == 0 || (!bytes[ind - 1].is_ascii_alphanumeric() && bytes[ind - 1] != b'_') {
+                if ind + len == contents.len()
+                    || (!bytes[ind + len].is_ascii_alphanumeric() && bytes[ind + len] != b'_')
+                {
+                    referenced_asset_files.insert(asset.clone());
+                }
+            }
         }
     });
 

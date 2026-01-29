@@ -42,6 +42,7 @@ debug = true
 [profile.dist]
 inherits = "release"
 lto = "thin"
+debug = false
 
 [[example]]
 name = "comparison"
