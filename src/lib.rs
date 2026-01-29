@@ -1,8 +1,9 @@
 use std::{
-    collections::{HashMap, HashSet},
-    hash::{Hash, RandomState},
+    hash::Hash,
     path::{Path, PathBuf},
 };
+
+use hashbrown::DefaultHashBuilder;
 
 use glob::glob;
 use log::info;
@@ -40,12 +41,13 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
         Vec::new()
     };
 
-    let registered_assets: HashSet<PathBuf> = assets.iter().map(|x| x.path.clone()).collect();
+    let registered_assets: hashbrown::HashSet<PathBuf> =
+        assets.iter().map(|x| x.path.clone()).collect();
 
-    let mut deps: HashSet<String> = if args.deps {
+    let mut deps: hashbrown::HashSet<String> = if args.deps {
         pubspec.dependencies.keys().cloned().collect()
     } else {
-        HashSet::new()
+        hashbrown::HashSet::new()
     };
     // TODO allow to set entry point
     localisation::set_class_name(&pubspec.flutter_intl.class_name)?;
@@ -53,13 +55,13 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
 
     let dart = glob("lib/**/*.dart").expect("Failed to read glob pattern");
     let dart: Vec<PathBuf> = dart.flatten().collect();
-    let mut assets_set: papaya::HashSet<AssetItem, RandomState> =
+    let mut assets_set: papaya::HashSet<AssetItem, DefaultHashBuilder> =
         papaya::HashSet::from_iter(assets);
 
     let locator: papaya::HashMap<String, bool> = papaya::HashMap::with_capacity(dart.len() / 10);
     let labels: papaya::HashSet<String> = papaya::HashSet::with_capacity(dart.len() / 10);
 
-    let results: HashMap<PathBuf, Data> = dart
+    let results: hashbrown::HashMap<PathBuf, Data> = dart
         .clone()
         .into_par_iter()
         .map(|path| {
@@ -82,7 +84,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
         })
         .collect();
 
-    let mut dart: HashSet<PathBuf> = dart.into_iter().collect();
+    let mut dart: hashbrown::HashSet<PathBuf> = dart.into_iter().collect();
 
     // Collect all the linked files from the entry file
     collapse_list(&main, &results, &mut dart, &mut assets_set, &mut deps);
@@ -124,7 +126,8 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
 
     if args.labels {
         // read arb files to get all localisation keys
-        let mut all_localisation_keys: HashSet<String> = HashSet::with_capacity(10_000);
+        let mut all_localisation_keys: hashbrown::HashSet<String> =
+            hashbrown::HashSet::with_capacity(10_000);
         let arb_files = glob("lib/l10n/*.arb").expect("Failed to read glob pattern");
         for arb in arb_files.flatten() {
             let contents = std::fs::read_to_string(&arb).expect("Failed to read arb file");
@@ -193,7 +196,7 @@ enum ExtractedData {
 fn extract_single_file(
     file_path: &std::path::PathBuf,
     package_name: &str,
-    assets: &papaya::HashSet<AssetItem, RandomState>,
+    assets: &papaya::HashSet<AssetItem, DefaultHashBuilder>,
     args: cli::Options,
     locator: &papaya::HashMap<String, bool>,
     labels: &papaya::HashSet<String>,
@@ -241,7 +244,7 @@ fn extract_single_file(
     }
 
     #[allow(clippy::mutable_key_type)]
-    let mut referenced_asset_files = HashSet::with_capacity(10);
+    let mut referenced_asset_files = hashbrown::HashSet::with_capacity(10);
 
     let mut assets = assets.pin();
     // First, collect all assets that match the content
@@ -287,10 +290,10 @@ fn extract_single_file(
 
 fn collapse_list(
     path: &PathBuf,
-    files: &HashMap<PathBuf, Data>,
-    referenced: &mut HashSet<PathBuf>,
-    assets: &mut papaya::HashSet<AssetItem, RandomState>,
-    deps: &mut HashSet<String>,
+    files: &hashbrown::HashMap<PathBuf, Data>,
+    referenced: &mut hashbrown::HashSet<PathBuf>,
+    assets: &mut papaya::HashSet<AssetItem, DefaultHashBuilder>,
+    deps: &mut hashbrown::HashSet<String>,
 ) {
     let file = files.get(path).unwrap();
     for entry in &file.items {
