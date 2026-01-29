@@ -64,3 +64,7 @@ Options:
 Rust has great libraries for creating custom parsers and is really performant. While developing this and testing it against a Flutter project with over 7100 files, it managed to complete it in less than second with all the flags enabled except remove.
 
 It would be possible to do the same in Dart using the `Analyzer` package, but the performance would be not great.
+
+## Contributions
+
+Contributions, suggestions and PRs are welcome.
