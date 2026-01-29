@@ -42,10 +42,10 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
 
     let registered_assets: HashSet<PathBuf> = assets.iter().map(|x| x.path.clone()).collect();
     // info!("{} assets registered", assets.len());
-    let deps: Vec<String> = if args.deps {
+    let mut deps: HashSet<String> = if args.deps {
         pubspec.dependencies.keys().cloned().collect()
     } else {
-        Vec::new()
+        HashSet::new()
     };
     // TODO allow to set entry point
     localisation::set_class_name(&pubspec.flutter_intl.class_name)?;
@@ -97,7 +97,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     let mut dart: HashSet<PathBuf> = dart.into_iter().collect();
 
     // Collect all the linked files from the entry file
-    collapse_list(&main, &results, &mut dart, &mut assets_set);
+    collapse_list(&main, &results, &mut dart, &mut assets_set, &mut deps);
 
     if !assets_set.is_empty() {
         let assets_set = assets_set.pin();
@@ -301,6 +301,7 @@ fn collapse_list(
     files: &dashmap::DashMap<PathBuf, Data>,
     referenced: &mut HashSet<PathBuf>,
     assets: &mut papaya::HashSet<AssetItem, RandomState>,
+    deps: &mut HashSet<String>,
 ) {
     let file = files.get(path).unwrap();
     for entry in &file.items {
@@ -308,11 +309,11 @@ fn collapse_list(
             ExtractedData::Path(path_buf) => {
                 if referenced.remove(path_buf) {
                     // File was in the list
-                    collapse_list(path_buf, files, referenced, assets);
+                    collapse_list(path_buf, files, referenced, assets, deps);
                 }
             }
-            ExtractedData::Dep(_) => {
-                // TODO
+            ExtractedData::Dep(package) => {
+                deps.remove(package);
             }
         }
     }
