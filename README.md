@@ -4,7 +4,7 @@ This is a tool to scan the Dart project and determine if there are unused files,
 
 ## How does it work
 
-Based on the entry file, it will scan the imports and determine which files and dependencies are referenced and recursively search through all the linked files.
+It will parse all the Dart files and find all the imported files in parallel. After gathering all the data, it will start with the entry file and follow paths imported files and determine which ones are actually used and which are not.
 
 NOTE: This method is not perfect as there are other ways to import packages. To combat this, the tool also checks if the file contains the name of the package. While not perfect it does find some edge cases.
 
@@ -61,6 +61,10 @@ Options:
 
 ## Why Rust
 
-Rust has great libraries for creating custom parsers and is really performant. While developing this and testing it against a Flutter project with over 6100 files, it managed to complete it in just over a 1 second with all the flags enabled except remove.
+Rust has great libraries for creating custom parsers and is really performant. While developing this and testing it against a Flutter project with over 7100 files, it managed to complete it in less than second with all the flags enabled except remove.
 
 It would be possible to do the same in Dart using the `Analyzer` package, but the performance would be not great.
+
+## Contributions
+
+Contributions, suggestions and PRs are welcome.

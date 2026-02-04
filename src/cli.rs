@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+#[derive(Debug, Clone)]
 pub struct Options {
     pub path: PathBuf,
     pub remove: bool,
