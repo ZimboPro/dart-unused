@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use glob::glob;
+use presence_rs::Presence;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -50,9 +51,9 @@ pub struct PubspecSchema {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub environment: Option<Environment>,
     #[serde(default)]
-    pub flutter: Flutter,
+    pub flutter: Presence<Flutter>,
     #[serde(default)]
-    pub flutter_intl: FlutterIntl,
+    pub flutter_intl: Presence<FlutterIntl>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -674,7 +675,8 @@ flutter:
         assert!(advisories.contains(&"GHSA-4rgh-jx4f-qfcq".to_string()));
 
         // Test flutter section
-        let flutter = pubspec.flutter.clone();
+        assert!(pubspec.flutter.is_present());
+        let flutter = pubspec.flutter.clone().unwrap();
         assert!(flutter.uses_material_design);
         assert!(flutter.generate);
 

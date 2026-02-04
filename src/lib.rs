@@ -35,8 +35,13 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     util::set_current_dir(&args.path)?;
     info!("Current directory set to {:?}", std::env::current_dir()?);
     let pubspec = pubspec::get_package_details()?;
-    let assets = if args.assets {
-        get_assets(pubspec.flutter.get_assets(), &config.assets.ignore)?
+    let mut flutter = Option::None;
+    let assets = if args.assets && pubspec.flutter.is_present() {
+        flutter = pubspec.flutter.to_optional();
+        get_assets(
+            flutter.as_ref().unwrap().get_assets(),
+            &config.assets.ignore,
+        )?
     } else {
         Vec::new()
     };
@@ -50,7 +55,14 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
         hashbrown::HashSet::new()
     };
     // TODO allow to set entry point
-    localisation::set_class_name(&pubspec.flutter_intl.class_name)?;
+    if args.labels && pubspec.flutter_intl.is_present() {
+        localisation::set_class_name(&pubspec.flutter_intl.unwrap().class_name)?;
+    } else if args.labels && pubspec.flutter_intl.is_empty() {
+        log::warn!("flutter_intl section not found in pubspec.yaml, using default class name 'S'");
+        return Err(anyhow::anyhow!(
+            "flutter_intl section not found in pubspec.yaml"
+        ));
+    }
     let main = PathBuf::from("lib/main.dart");
 
     let dart = glob("lib/**/*.dart").expect("Failed to read glob pattern");
@@ -101,7 +113,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
         }
         log::info!("");
         let mut all_assets: Vec<PathBuf> =
-            get_all_items_in_asset_dir(&pubspec.flutter.get_asset_paths(), &config.assets.ignore)?;
+            get_all_items_in_asset_dir(&flutter.unwrap().get_asset_paths(), &config.assets.ignore)?;
 
         all_assets.retain(|x| !registered_assets.contains(x));
 
