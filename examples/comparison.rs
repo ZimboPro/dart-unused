@@ -75,17 +75,15 @@ fn main() -> anyhow::Result<()> {
     for _ in 0..args.iterations {
         cnt = 0;
         for term in terms.iter() {
-            for s in memchr::memmem::find_iter(&contents.as_bytes(), term.as_bytes()) {
-                if s == 0
+            for s in memchr::memmem::find_iter(contents.as_bytes(), term.as_bytes()) {
+                if (s == 0
                     || (!contents.as_bytes()[s - 1].is_ascii_alphanumeric()
-                        && contents.as_bytes()[s - 1] != b'_')
-                {
-                    if s + term.len() == contents.len()
+                        && contents.as_bytes()[s - 1] != b'_'))
+                    && (s + term.len() == contents.len()
                         || (!contents.as_bytes()[s + term.len()].is_ascii_alphanumeric()
-                            && contents.as_bytes()[s + term.len()] != b'_')
-                    {
-                        cnt += 1;
-                    }
+                            && contents.as_bytes()[s + term.len()] != b'_'))
+                {
+                    cnt += 1;
                 }
             }
         }
@@ -107,17 +105,15 @@ fn main() -> anyhow::Result<()> {
     for _ in 0..args.iterations {
         cnt = 0;
         for term in finders.iter() {
-            for s in term.find_iter(&contents.as_bytes()) {
-                if s == 0
+            for s in term.find_iter(contents.as_bytes()) {
+                if (s == 0
                     || (!contents.as_bytes()[s - 1].is_ascii_alphanumeric()
-                        && contents.as_bytes()[s - 1] != b'_')
-                {
-                    if s + term.needle().len() == contents.len()
+                        && contents.as_bytes()[s - 1] != b'_'))
+                    && (s + term.needle().len() == contents.len()
                         || (!contents.as_bytes()[s + term.needle().len()].is_ascii_alphanumeric()
-                            && contents.as_bytes()[s + term.needle().len()] != b'_')
-                    {
-                        cnt += 1;
-                    }
+                            && contents.as_bytes()[s + term.needle().len()] != b'_'))
+                {
+                    cnt += 1;
                 }
             }
         }
@@ -135,16 +131,14 @@ fn main() -> anyhow::Result<()> {
     for _ in 0..args.iterations {
         cnt = 0;
         for s in ac.find_iter(&contents) {
-            if s.start() == 0
+            if (s.start() == 0
                 || (!contents.as_bytes()[s.start() - 1].is_ascii_alphanumeric()
-                    && contents.as_bytes()[s.start() - 1] != b'_')
-            {
-                if s.end() == contents.len()
+                    && contents.as_bytes()[s.start() - 1] != b'_'))
+                && (s.end() == contents.len()
                     || (!contents.as_bytes()[s.end()].is_ascii_alphanumeric()
-                        && contents.as_bytes()[s.end()] != b'_')
-                {
-                    cnt += 1;
-                }
+                        && contents.as_bytes()[s.end()] != b'_'))
+            {
+                cnt += 1;
             }
         }
     }
