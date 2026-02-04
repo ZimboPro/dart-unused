@@ -264,12 +264,11 @@ fn extract_single_file(
     assets.iter().for_each(|asset| {
         let len = asset.file_name.len();
         for ind in memchr::memmem::find_iter(bytes, asset.file_name.as_bytes()) {
-            if ind == 0 || (!bytes[ind - 1].is_ascii_alphanumeric() && bytes[ind - 1] != b'_') {
-                if ind + len == contents.len()
-                    || (!bytes[ind + len].is_ascii_alphanumeric() && bytes[ind + len] != b'_')
-                {
-                    referenced_asset_files.insert(asset.clone());
-                }
+            if (ind == 0 || (!bytes[ind - 1].is_ascii_alphanumeric() && bytes[ind - 1] != b'_'))
+                && (ind + len == contents.len()
+                    || (!bytes[ind + len].is_ascii_alphanumeric() && bytes[ind + len] != b'_'))
+            {
+                referenced_asset_files.insert(asset.clone());
             }
         }
     });
