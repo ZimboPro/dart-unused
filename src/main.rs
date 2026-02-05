@@ -1,10 +1,7 @@
 use dart_unused::{cli::Options, get_unreferenced_files};
-use log::LevelFilter;
-use simplelog::{
-    ColorChoice, CombinedLogger, Config, ConfigBuilder, TermLogger, TerminalMode, WriteLogger,
-};
+use log::{LevelFilter, Log, Metadata, Record, SetLoggerError, set_boxed_logger, set_max_level};
 
-use std::{fs::File, path::PathBuf};
+use std::{io::Write, path::PathBuf};
 
 use clap::Parser;
 
@@ -52,10 +49,67 @@ impl From<Args> for Options {
     }
 }
 
+struct BufferedWriteLogger {
+    level: LevelFilter,
+    buffer: std::sync::Mutex<Vec<u8>>,
+    file: Option<PathBuf>,
+}
+
+impl BufferedWriteLogger {
+    pub fn init(log_level: LevelFilter, file: Option<PathBuf>) -> Result<(), SetLoggerError> {
+        set_max_level(log_level);
+        set_boxed_logger(BufferedWriteLogger::new(log_level, file))
+    }
+
+    pub fn new(log_level: LevelFilter, file: Option<PathBuf>) -> Box<BufferedWriteLogger> {
+        Box::new(BufferedWriteLogger {
+            level: log_level,
+            file,
+            buffer: std::sync::Mutex::new(Vec::new()),
+        })
+    }
+}
+
+impl Log for BufferedWriteLogger {
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        metadata.level() <= self.level
+    }
+
+    fn log(&self, record: &Record<'_>) {
+        if self.enabled(record.metadata()) {
+            self.buffer
+                .lock()
+                .unwrap()
+                .extend_from_slice(format!("{}\n", record.args()).as_bytes());
+        }
+    }
+
+    fn flush(&self) {
+        let mut buffer = self.buffer.lock().unwrap();
+        if !buffer.is_empty() {
+            std::io::stdout().write_all(&buffer).unwrap();
+            std::io::stdout().flush().unwrap();
+            if let Some(file) = &self.file {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(file)
+                    .unwrap()
+                    .write_all(&buffer)
+                    .unwrap();
+            }
+            buffer.clear();
+        }
+    }
+}
+
+impl Drop for BufferedWriteLogger {
+    fn drop(&mut self) {
+        self.flush();
+    }
+}
+
 fn main() -> anyhow::Result<()> {
-    let config = ConfigBuilder::new()
-        .set_time_level(log::LevelFilter::Off)
-        .build();
     let args = Args::parse();
     let log_level = if args.verbose {
         LevelFilter::Debug
@@ -63,17 +117,9 @@ fn main() -> anyhow::Result<()> {
         LevelFilter::Info
     };
     if args.output {
-        CombinedLogger::init(vec![
-            TermLogger::new(log_level, config, TerminalMode::Mixed, ColorChoice::Auto),
-            WriteLogger::new(
-                log_level,
-                Config::default(),
-                File::create("dart-unused.log").unwrap(),
-            ),
-        ])?;
+        BufferedWriteLogger::init(log_level, Some("dart-unused.log".into()))?;
     } else {
-        TermLogger::init(log_level, config, TerminalMode::Mixed, ColorChoice::Auto)?;
+        BufferedWriteLogger::init(log_level, None)?;
     }
-
     get_unreferenced_files(args.into())
 }
