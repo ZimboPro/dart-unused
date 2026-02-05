@@ -150,7 +150,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
         let arb_files = glob("lib/l10n/*.arb").expect("Failed to read glob pattern");
         let arb_files: Vec<std::path::PathBuf> = arb_files.flatten().collect();
         for arb in arb_files.iter() {
-            let contents = std::fs::read_to_string(&arb).expect("Failed to read arb file");
+            let contents = std::fs::read_to_string(arb).expect("Failed to read arb file");
             let json: serde_json::Value =
                 serde_json::from_str(&contents).expect("Failed to parse arb file");
             if let serde_json::Value::Object(map) = json {
@@ -173,7 +173,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
         }
         if args.remove {
             for arb in arb_files.iter() {
-                let contents = std::fs::read_to_string(&arb).expect("Failed to read arb file");
+                let contents = std::fs::read_to_string(arb).expect("Failed to read arb file");
                 let json: serde_json::Value =
                     serde_json::from_str(&contents).expect("Failed to parse arb file");
                 if let serde_json::Value::Object(mut map) = json {
@@ -183,7 +183,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
                     let new_contents =
                         serde_json::to_string_pretty(&serde_json::Value::Object(map))
                             .expect("Failed to serialize arb file");
-                    std::fs::write(&arb, new_contents).expect("Failed to write arb file");
+                    std::fs::write(arb, new_contents).expect("Failed to write arb file");
                 }
             }
         }
@@ -355,7 +355,7 @@ fn extract_single_file(
     }
 
     if args.labels {
-        let s = all_localisation(&bytes);
+        let s = all_localisation(bytes);
         if let Ok((_, keys)) = s {
             let labels_referenced = labels.pin();
             for key in keys {
@@ -365,7 +365,7 @@ fn extract_single_file(
     }
 
     if args.loc
-        && let Ok((_, r)) = locator::locator(&bytes)
+        && let Ok((_, r)) = locator::locator(bytes)
     {
         let locators = locator.pin();
         for reg in r {

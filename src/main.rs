@@ -52,7 +52,6 @@ impl From<Args> for Options {
 struct BufferedWriteLogger {
     level: LevelFilter,
     buffer: std::sync::Mutex<Vec<u8>>,
-    file: Option<PathBuf>,
     log_file: Option<std::fs::File>,
 }
 
@@ -65,18 +64,13 @@ impl BufferedWriteLogger {
     pub fn new(log_level: LevelFilter, file: Option<PathBuf>) -> Box<BufferedWriteLogger> {
         Box::new(BufferedWriteLogger {
             level: log_level,
-            log_file: if let Some(file) = &file {
-                Some(
-                    std::fs::OpenOptions::new()
-                        .create(true)
-                        .append(true)
-                        .open(file)
-                        .unwrap(),
-                )
-            } else {
-                None
-            },
-            file,
+            log_file: file.as_ref().map(|file| {
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(file)
+                    .unwrap()
+            }),
             buffer: std::sync::Mutex::new(Vec::new()),
         })
     }
