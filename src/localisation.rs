@@ -20,15 +20,15 @@ pub fn set_class_name(class_name: &str) -> anyhow::Result<()> {
 }
 
 /// Parse all localisation keys from a string
-pub fn all_localisation(input: &str) -> IResult<&str, Vec<&str>> {
+pub fn all_localisation(input: &[u8]) -> IResult<&[u8], Vec<&[u8]>> {
     many0(localisation).parse(input)
 }
 
 /// Parse a single localisation key from a string
-pub fn localisation(input: &str) -> IResult<&str, &str> {
+pub fn localisation(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let (remaining, (_, _, _, _, _, _, _, _, key)) = (
-        take_until(INSTANCE.get().unwrap().as_str()),
-        tag(INSTANCE.get().unwrap().as_str()),
+        take_until(INSTANCE.get().unwrap().as_bytes()),
+        tag(INSTANCE.get().unwrap().as_bytes()),
         multispace0,
         tag("."),
         multispace0,
@@ -41,7 +41,7 @@ pub fn localisation(input: &str) -> IResult<&str, &str> {
     Ok((remaining, key))
 }
 
-fn of_context(input: &str) -> IResult<&str, &str> {
+fn of_context(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let (remaining, _s) = (
         multispace0,
         tag("of("),
@@ -49,10 +49,10 @@ fn of_context(input: &str) -> IResult<&str, &str> {
         tag(")"),
     )
         .parse(input)?;
-    Ok((remaining, ""))
+    Ok((remaining, "".as_bytes()))
 }
 
-fn maybe_of(input: &str) -> IResult<&str, &str> {
+fn maybe_of(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let (remaining, _s) = (
         multispace0,
         tag("maybeOf("),
@@ -62,11 +62,11 @@ fn maybe_of(input: &str) -> IResult<&str, &str> {
         tag("?"),
     )
         .parse(input)?;
-    Ok((remaining, ""))
+    Ok((remaining, "".as_bytes()))
 }
 
-pub(crate) fn is_alphanumeric_or_underscore(input: &str) -> IResult<&str, &str> {
-    take_till(|c: char| !c.is_alphanumeric() && c != '_' && c != '.')(input)
+fn is_alphanumeric_or_underscore(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    take_till(|c: u8| !c.is_ascii_alphanumeric() && c != b'_' && c != b'.').parse(input)
 }
 
 #[cfg(test)]
@@ -80,18 +80,18 @@ mod tests {
         Once::new().call_once(|| {
             let _ = INSTANCE.set("S".to_string());
         });
-        let input = "S.of(context).app_name";
-        let expected = "app_name";
+        let input = b"S.of(context).app_name";
+        let expected = b"app_name";
         let (_, actual) = localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = "S.current.app_name";
-        let expected = "app_name";
+        let input = b"S.current.app_name";
+        let expected = b"app_name";
         let (_, actual) = localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = "S.maybeOf(context)?.app_name";
-        let expected = "app_name";
+        let input = b"S.maybeOf(context)?.app_name";
+        let expected = b"app_name";
         let (_, actual) = localisation(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -101,42 +101,42 @@ mod tests {
         Once::new().call_once(|| {
             let _ = INSTANCE.set("S".to_string());
         });
-        let input = r#"""S.of(context)
+        let input = br#"""S.of(context)
             .app_name"""#;
-        let expected = "app_name";
+        let expected = b"app_name";
         let (_, actual) = localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = r#"""S.current
+        let input = br#"""S.current
         .app_name"""#;
-        let expected = "app_name";
+        let expected = b"app_name";
         let (_, actual) = localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = r#"""S.maybeOf(context)
+        let input = br#"""S.maybeOf(context)
         ?.app_name"""#;
-        let expected = "app_name";
+        let expected = b"app_name";
         let (_, actual) = localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = r#"""S
+        let input = br#"""S
         .of(context)
             .app_name"""#;
-        let expected = "app_name";
+        let expected = b"app_name";
         let (_, actual) = localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = r#"""S
+        let input = br#"""S
         .current
         .app_name"""#;
-        let expected = "app_name";
+        let expected = b"app_name";
         let (_, actual) = localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = r#"""S
+        let input = br#"""S
         .maybeOf(context)
         ?.app_name"""#;
-        let expected = "app_name";
+        let expected = b"app_name";
         let (_, actual) = localisation(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -146,27 +146,27 @@ mod tests {
         Once::new().call_once(|| {
             let _ = INSTANCE.set("S".to_string());
         });
-        let input = r#""S.of(context).app_name
+        let input = br#""S.of(context).app_name
         S.of(context).app_name""#;
-        let expected = vec!["app_name", "app_name"];
+        let expected = vec![b"app_name", b"app_name"];
         let (_, actual) = all_localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = r#""S.current.app_name
+        let input = br#""S.current.app_name
         S.current.app_name""#;
-        let expected = vec!["app_name", "app_name"];
+        let expected = vec![b"app_name", b"app_name"];
         let (_, actual) = all_localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = r#""S.maybeOf(context)?.app_name
+        let input = br#""S.maybeOf(context)?.app_name
         S.maybeOf(context)?.app_name""#;
-        let expected = vec!["app_name", "app_name"];
+        let expected = vec![b"app_name", b"app_name"];
         let (_, actual) = all_localisation(input).unwrap();
         assert_eq!(expected, actual);
-        let input = r#""S.of(context).app_name, S.of(context)
+        let input = br#""S.of(context).app_name, S.of(context)
         .app_name
         S.maybeOf(context)?.app_name""#;
-        let expected = vec!["app_name", "app_name", "app_name"];
+        let expected = vec![b"app_name", b"app_name", b"app_name"];
         let (_, actual) = all_localisation(input).unwrap();
         assert_eq!(expected, actual);
     }
@@ -176,27 +176,27 @@ mod tests {
         Once::new().call_once(|| {
             let _ = INSTANCE.set("S".to_string());
         });
-        let input = r#""t: S.of(context).app_name,
+        let input = br#""t: S.of(context).app_name,
         k: S.of(context).app_name""#;
-        let expected = vec!["app_name", "app_name"];
+        let expected = vec![b"app_name", b"app_name"];
         let (_, actual) = all_localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = r#""t: S.current.app_name,
+        let input = br#""t: S.current.app_name,
         K:S.current.app_name""#;
-        let expected = vec!["app_name", "app_name"];
+        let expected = vec![b"app_name", b"app_name"];
         let (_, actual) = all_localisation(input).unwrap();
         assert_eq!(expected, actual);
 
-        let input = r#""t:S.maybeOf(context)?.app_name
+        let input = br#""t:S.maybeOf(context)?.app_name
         e:S.maybeOf(context)?.app_name""#;
-        let expected = vec!["app_name", "app_name"];
+        let expected = vec![b"app_name", b"app_name"];
         let (_, actual) = all_localisation(input).unwrap();
         assert_eq!(expected, actual);
-        let input = r#""d: S.of(context).app_name, k:S.of(context)
+        let input = br#""d: S.of(context).app_name, k:S.of(context)
         .app_name
         s: S.maybeOf(context)?.app_name""#;
-        let expected = vec!["app_name", "app_name", "app_name"];
+        let expected = vec![b"app_name", b"app_name", b"app_name"];
         let (_, actual) = all_localisation(input).unwrap();
         assert_eq!(expected, actual);
     }

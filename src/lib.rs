@@ -1,4 +1,5 @@
 use std::{
+    fs::File,
     hash::Hash,
     path::{Path, PathBuf},
 };
@@ -123,17 +124,23 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
             }
             log::info!("");
         }
-        if args.remove {
+        if args.remove && (!all_assets.is_empty() || !remaining_assets.is_empty()) {
+            info!("Removing unreferenced assets...");
+            for asset in remaining_assets.iter() {
+                std::fs::remove_file(asset)?;
+            }
             for asset in all_assets.iter() {
                 std::fs::remove_file(asset)?;
             }
         }
+        log::logger().flush();
     }
     if args.deps {
         for dep in deps.iter().enumerate() {
             log::error!("{}. Unused dependencies: {:?}", dep.0 + 1, dep.1);
         }
         log::info!("");
+        log::logger().flush();
     }
 
     if args.labels {
@@ -141,7 +148,8 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
         let mut all_localisation_keys: hashbrown::HashSet<String> =
             hashbrown::HashSet::with_capacity(10_000);
         let arb_files = glob("lib/l10n/*.arb").expect("Failed to read glob pattern");
-        for arb in arb_files.flatten() {
+        let arb_files: Vec<std::path::PathBuf> = arb_files.flatten().collect();
+        for arb in arb_files.iter() {
             let contents = std::fs::read_to_string(&arb).expect("Failed to read arb file");
             let json: serde_json::Value =
                 serde_json::from_str(&contents).expect("Failed to parse arb file");
@@ -163,7 +171,24 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
                 label.1
             );
         }
+        if args.remove {
+            for arb in arb_files.iter() {
+                let contents = std::fs::read_to_string(&arb).expect("Failed to read arb file");
+                let json: serde_json::Value =
+                    serde_json::from_str(&contents).expect("Failed to parse arb file");
+                if let serde_json::Value::Object(mut map) = json {
+                    for key in all_localisation_keys.iter() {
+                        map.remove(key);
+                    }
+                    let new_contents =
+                        serde_json::to_string_pretty(&serde_json::Value::Object(map))
+                            .expect("Failed to serialize arb file");
+                    std::fs::write(&arb, new_contents).expect("Failed to write arb file");
+                }
+            }
+        }
         log::info!("");
+        log::logger().flush();
     }
 
     if args.loc {
@@ -178,6 +203,10 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     for file in dart.iter().enumerate() {
         log::error!("{} Unreferenced file: {:?}", file.0 + 1, file.1);
     }
+
+    // Flush logs manually after logging all unreferenced items
+    log::logger().flush();
+
     if args.remove {
         for file in dart.iter() {
             std::fs::remove_file(file)?;
@@ -214,10 +243,57 @@ fn extract_single_file(
     labels: &papaya::HashSet<String>,
 ) -> (Vec<ExtractedData>, Vec<AssetItem>) {
     let mut files = Vec::new();
-    let contents = std::fs::read_to_string(file_path)
-        .unwrap_or_else(|_| panic!("Failed to read file: {:?}", file_path));
+    // Read the file contents using memory-mapped I/O for efficiency
+    let file = unsafe {
+        memmap2::MmapOptions::new()
+            .map(&File::open(file_path).unwrap())
+            .unwrap()
+    };
+
+    // match parser::dart_files(&file) {
+    //     Ok((_, imports)) => {
+    //         for dart in imports {
+    //             match dart {
+    //                 parser::DartFile::Import(path) => {
+    //                     // relative path imports
+    //                     let file = path.replace("%20", " ");
+    //                     let file = Path::new(&file);
+    //                     let file = file_path.parent().unwrap().join(file);
+    //                     files.push(ExtractedData::Path(file.parse_dot().unwrap().to_path_buf()));
+    //                 }
+    //                 parser::DartFile::Package(name, mut path) => {
+    //                     // package imports
+    //                     if name == package_name {
+    //                         path.insert_str(0, "lib");
+    //                         let path = path.replace("%20", " ");
+    //                         let file = Path::new(&path);
+    //                         files.push(ExtractedData::Path(file.to_path_buf()));
+    //                     } else {
+    //                         // referenced_packages.push(DartFile::Package(name, path));
+    //                         // Remove deps used in referenced files
+    //                         files.push(ExtractedData::Dep(name));
+    //                     }
+    //                 }
+    //                 parser::DartFile::Part(value) => {
+    //                     // part files
+    //                     let mut file = file_path.clone();
+    //                     file.set_file_name(value);
+    //                     files.push(ExtractedData::Path(file));
+    //                 }
+    //                 parser::DartFile::Export(path) => {
+    //                     let file = path.replace("%20", " ");
+    //                     let file = Path::new(&file);
+    //                     let file = file_path.parent().unwrap().join(file);
+    //                     files.push(ExtractedData::Path(file.parse_dot().unwrap().to_path_buf()));
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     Err(_) => todo!(),
+    // }
+    let contents = String::from_utf8_lossy(&file);
     for line in contents.lines() {
-        if let Ok((_, dart)) = parser::dart_file(line) {
+        if let Ok((_, dart)) = parser::dart_file(line.as_bytes()) {
             match dart {
                 parser::DartFile::Import(path) => {
                     // relative path imports
@@ -260,12 +336,12 @@ fn extract_single_file(
 
     let mut assets = assets.pin();
     // First, collect all assets that match the content
-    let bytes = contents.as_bytes();
+    let bytes = file.as_ref();
     assets.iter().for_each(|asset| {
         let len = asset.file_name.len();
         for ind in memchr::memmem::find_iter(bytes, asset.file_name.as_bytes()) {
             if (ind == 0 || (!bytes[ind - 1].is_ascii_alphanumeric() && bytes[ind - 1] != b'_'))
-                && (ind + len == contents.len()
+                && (ind + len == file.len()
                     || (!bytes[ind + len].is_ascii_alphanumeric() && bytes[ind + len] != b'_'))
             {
                 referenced_asset_files.insert(asset.clone());
@@ -279,17 +355,17 @@ fn extract_single_file(
     }
 
     if args.labels {
-        let s = all_localisation(&contents);
+        let s = all_localisation(&bytes);
         if let Ok((_, keys)) = s {
             let labels_referenced = labels.pin();
             for key in keys {
-                labels_referenced.insert(key.to_owned());
+                labels_referenced.insert(String::from_utf8(key.to_vec()).unwrap());
             }
         }
     }
 
     if args.loc
-        && let Ok((_, r)) = locator::locator(&contents)
+        && let Ok((_, r)) = locator::locator(&bytes)
     {
         let locators = locator.pin();
         for reg in r {

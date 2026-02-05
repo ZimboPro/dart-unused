@@ -25,7 +25,7 @@ impl TryFrom<&str> for DartFile {
     type Error = &'static str;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match dart_file(value) {
+        match dart_file(value.as_bytes()) {
             Ok((_, dart)) => {
                 if let DartFile::Import(path) = &dart
                     && path.contains(":")
@@ -54,53 +54,59 @@ impl TryFrom<&DartFile> for DartFile {
 }
 
 /// Parses a single or multiple quotes (either single or double quotes).
-fn quote(input: &str) -> IResult<&str, &str> {
+fn quote(input: &[u8]) -> IResult<&[u8], &[u8]> {
     alt((tag("'"), tag("\""))).parse(input)
 }
 
 /// Checks if the input string contains a colon.
-fn no_colons_in_input(input: &str) -> IResult<&str, &str> {
-    if input.contains(":") {
+fn no_colons_in_input(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    if input.contains(&b':') {
         return Err(nom::Err::Error(nom::error::Error::new(
             input,
             nom::error::ErrorKind::NoneOf,
         )));
     }
-    Ok(("", input))
+    Ok((b"", input))
 }
 
 /// Parses an import statement and returns a `DartFile::Import` variant.
-fn import_parser(input: &str) -> IResult<&str, DartFile> {
+fn import_parser(input: &[u8]) -> IResult<&[u8], DartFile> {
     let (remaining, (_, _, _, path)) =
         (tag("import"), multispace1, quote, take_until_quote).parse(input)?;
     no_colons_in_input(path)?;
 
-    Ok((remaining, DartFile::Import(path.to_string())))
+    Ok((
+        remaining,
+        DartFile::Import(String::from_utf8(path.to_vec()).unwrap()),
+    ))
 }
 
 /// Parses an import statement using the `import_parser` function and converts the result to `DartFile` using `TryFrom`.
-fn import(input: &str) -> IResult<&str, DartFile> {
+fn import(input: &[u8]) -> IResult<&[u8], DartFile> {
     let mut parser = map_res(import_parser, DartFile::try_from);
 
     parser.parse(input)
 }
 
 /// Parses an export statement and returns a `DartFile::Export` variant.
-fn export_parser(input: &str) -> IResult<&str, DartFile> {
+fn export_parser(input: &[u8]) -> IResult<&[u8], DartFile> {
     let (remaining, (_, _, _, path)) =
         (tag("export"), multispace1, quote, take_until_quote).parse(input)?;
     no_colons_in_input(path)?;
 
-    Ok((remaining, DartFile::Export(path.to_string())))
+    Ok((
+        remaining,
+        DartFile::Export(String::from_utf8(path.to_vec()).unwrap()),
+    ))
 }
 
 /// Parses an export statement using the `import_parser` function and converts the result to `DartFile` using `TryFrom`.
-fn export(input: &str) -> IResult<&str, DartFile> {
+fn export(input: &[u8]) -> IResult<&[u8], DartFile> {
     export_parser(input)
 }
 
 /// Parses a package statement and returns a `DartFile::Package` variant.
-fn package(input: &str) -> IResult<&str, DartFile> {
+fn package(input: &[u8]) -> IResult<&[u8], DartFile> {
     let (remaining, (_, _, _, _, name, path)) = (
         tag("import"),
         multispace1,
@@ -112,16 +118,22 @@ fn package(input: &str) -> IResult<&str, DartFile> {
         .parse(input)?;
     Ok((
         remaining,
-        DartFile::Package(name.to_string(), path.to_string()),
+        DartFile::Package(
+            String::from_utf8(name.to_vec()).unwrap(),
+            String::from_utf8(path.to_vec()).unwrap(),
+        ),
     ))
 }
 
 /// Parses a part statement and returns a `DartFile::Part` variant.
-fn part(input: &str) -> IResult<&str, DartFile> {
+fn part(input: &[u8]) -> IResult<&[u8], DartFile> {
     let (remaining, (_, _, _, value)) =
         (tag("part"), multispace1, quote, take_until_quote).parse(input)?;
 
-    Ok((remaining, DartFile::Part(value.to_string())))
+    Ok((
+        remaining,
+        DartFile::Part(String::from_utf8(value.to_vec()).unwrap()),
+    ))
 }
 
 /// Parses a Dart file statement and returns a `DartFile` variant.
@@ -129,7 +141,7 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// ```rust
 /// use dart_unused::parser::{DartFile, dart_file};
 ///
-/// let input = "import 'flutter/material.dart';";
+/// let input = b"import 'flutter/material.dart';";
 /// let expected = DartFile::Import("flutter/material.dart".to_string());
 /// let result = dart_file(input);
 /// assert_eq!(result, Ok(("';", expected)));
@@ -138,7 +150,7 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// ```rust
 /// use dart_unused::parser::{DartFile, dart_file};
 ///
-/// let input = "import 'package:flutter/material.dart';";
+/// let input = b"import 'package:flutter/material.dart';";
 /// let expected = DartFile::Package("flutter".to_string(), "/material.dart".to_string());
 /// let result = dart_file(input);
 /// assert_eq!(result, Ok(("';", expected)));
@@ -147,7 +159,7 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// ```rust
 /// use dart_unused::parser::{DartFile, dart_file};
 ///
-/// let input = "part 'material.g.dart';";
+/// let input = b"part 'material.g.dart';";
 /// let expected = DartFile::Part("material.g.dart".to_string());
 /// let result = dart_file(input);
 /// assert_eq!(result, Ok(("';", expected)));
@@ -156,7 +168,7 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// ```rust
 /// use dart_unused::parser::{DartFile, dart_file};
 ///
-/// let input = "import 'dart:io';";
+/// let input = b"import 'dart:io';";
 /// let result = dart_file(input);
 /// assert!(result.is_err());
 /// ```
@@ -164,17 +176,17 @@ fn part(input: &str) -> IResult<&str, DartFile> {
 /// ```rust
 /// use dart_unused::parser::{DartFile, dart_file};
 ///
-/// let input = "import 'flutter/material.dart';";
+/// let input = b"import 'flutter/material.dart';";
 /// let expected = DartFile::Import("flutter/material.dart".to_string());
 /// let result = dart_file(input);
 /// assert_eq!(result, Ok(("';", expected)));
 /// ```
-pub fn dart_file(input: &str) -> IResult<&str, DartFile> {
+pub fn dart_file(input: &[u8]) -> IResult<&[u8], DartFile> {
     alt((package, import, part, export)).parse(input)
 }
 
 /// Parses a string until a quote is encountered (either single or double quotes).
-fn take_until_quote(input: &str) -> IResult<&str, &str> {
+fn take_until_quote(input: &[u8]) -> IResult<&[u8], &[u8]> {
     alt((take_until1("'"), take_until1("\""))).parse(input)
 }
 
@@ -184,124 +196,124 @@ mod tests {
 
     #[test]
     fn test_import() {
-        let input = "import 'flutter/material.dart';";
+        let input = b"import 'flutter/material.dart';";
         let expected = DartFile::Import("flutter/material.dart".to_string());
         let result = import(input);
-        assert_eq!(result, Ok(("';", expected)));
+        assert_eq!(result, Ok(("';".as_bytes(), expected)));
     }
 
     #[test]
     fn test_import_path() {
-        let input = "import './flutter/material.dart';";
+        let input = b"import './flutter/material.dart';";
         let expected = DartFile::Import("./flutter/material.dart".to_string());
         let result = import(input);
-        assert_eq!(result, Ok(("';", expected)));
+        assert_eq!(result, Ok(("';".as_bytes(), expected)));
     }
 
     #[test]
     fn test_import_relative() {
-        let input = "import '../flutter/material.dart';";
+        let input = b"import '../flutter/material.dart';";
         let expected = DartFile::Import("../flutter/material.dart".to_string());
         let result = import(input);
-        assert_eq!(result, Ok(("';", expected)));
+        assert_eq!(result, Ok(("';".as_bytes(), expected)));
     }
 
     #[test]
     fn test_import_failure() {
-        let input = "import 'dart:io';";
+        let input = b"import 'dart:io';";
         let result = import(input);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_package() {
-        let input = "import 'package:flutter/material.dart';";
+        let input = b"import 'package:flutter/material.dart';";
         let expected = DartFile::Package("flutter".to_string(), "/material.dart".to_string());
         let result = package(input);
-        assert_eq!(result, Ok(("';", expected)));
+        assert_eq!(result, Ok(("';".as_bytes(), expected)));
     }
 
     #[test]
     fn test_part() {
-        let input = "part 'material.g.dart';";
+        let input = b"part 'material.g.dart';";
         let expected = DartFile::Part("material.g.dart".to_string());
         let result = part(input);
-        assert_eq!(result, Ok(("';", expected)));
+        assert_eq!(result, Ok(("';".as_bytes(), expected)));
     }
 
     #[test]
     fn test_dart_file_import() {
-        let input = "import 'flutter/material.dart';";
+        let input = b"import 'flutter/material.dart';";
         let expected = DartFile::Import("flutter/material.dart".to_string());
         let result = dart_file(input);
-        assert_eq!(result, Ok(("';", expected)));
+        assert_eq!(result, Ok(("';".as_bytes(), expected)));
     }
 
     #[test]
     fn test_dart_file_package() {
-        let input = "import 'package:flutter/material.dart';";
+        let input = b"import 'package:flutter/material.dart';";
         let expected = DartFile::Package("flutter".to_string(), "/material.dart".to_string());
         let result = dart_file(input);
-        assert_eq!(result, Ok(("';", expected)));
+        assert_eq!(result, Ok(("';".as_bytes(), expected)));
     }
 
     #[test]
     fn test_dart_file_part() {
-        let input = "part 'material.g.dart';";
+        let input = b"part 'material.g.dart';";
         let expected = DartFile::Part("material.g.dart".to_string());
         let result = dart_file(input);
-        assert_eq!(result, Ok(("';", expected)));
+        assert_eq!(result, Ok(("';".as_bytes(), expected)));
     }
 
     #[test]
     fn test_dart_file_import_error() {
-        let input = "import 'dart:io';";
+        let input = b"import 'dart:io';";
         let result = dart_file(input);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_commented_import() {
-        let input = "// import 'flutter/material.dart';";
+        let input = b"// import 'flutter/material.dart';";
         let result = dart_file(input);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_import_with_comment() {
-        let input = "import 'flutter/material.dart'; // comment";
+        let input = b"import 'flutter/material.dart'; // comment";
         let expected = DartFile::Import("flutter/material.dart".to_string());
         let result = dart_file(input);
-        assert_eq!(result, Ok(("'; // comment", expected)));
+        assert_eq!(result, Ok(("'; // comment".as_bytes(), expected)));
     }
 
     #[test]
     fn test_commented_part() {
-        let input = "// part 'material.g.dart';";
+        let input = b"// part 'material.g.dart';";
         let result = dart_file(input);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_part_with_comment() {
-        let input = "part 'material.g.dart'; // comment";
+        let input = b"part 'material.g.dart'; // comment";
         let expected = DartFile::Part("material.g.dart".to_string());
         let result = dart_file(input);
-        assert_eq!(result, Ok(("'; // comment", expected)));
+        assert_eq!(result, Ok(("'; // comment".as_bytes(), expected)));
     }
 
     #[test]
     fn test_commented_package() {
-        let input = "// import 'package:flutter/material.dart';";
+        let input = b"// import 'package:flutter/material.dart';";
         let result = dart_file(input);
         assert!(result.is_err());
     }
 
     #[test]
     fn test_package_with_comment() {
-        let input = "import 'package:flutter/material.dart'; // comment";
+        let input = b"import 'package:flutter/material.dart'; // comment";
         let expected = DartFile::Package("flutter".to_string(), "/material.dart".to_string());
         let result = dart_file(input);
-        assert_eq!(result, Ok(("'; // comment", expected)));
+        assert_eq!(result, Ok(("'; // comment".as_bytes(), expected)));
     }
 }

@@ -5,13 +5,11 @@
 use nom::{
     IResult, Parser,
     branch::alt,
-    bytes::complete::{tag, take_until},
+    bytes::complete::{tag, take_till, take_until},
     character::complete::multispace0,
     multi::many0,
     sequence::delimited,
 };
-
-use crate::localisation::is_alphanumeric_or_underscore;
 
 #[derive(Debug, PartialEq)]
 pub enum Locator {
@@ -21,7 +19,7 @@ pub enum Locator {
 }
 
 /// Parser to extract the class being registered and used the GetIt dart locator package using nom
-fn register_locator(input: &str) -> IResult<&str, Locator> {
+fn register_locator(input: &[u8]) -> IResult<&[u8], Locator> {
     let (rest, (_, _, _, class)) = (
         multispace0,
         tag("register"),
@@ -29,25 +27,28 @@ fn register_locator(input: &str) -> IResult<&str, Locator> {
         delimited(tag("<"), is_alphanumeric_or_underscore, tag(">")),
     )
         .parse(input)?;
-    Ok((rest, Locator::Register(class.to_string())))
+    Ok((
+        rest,
+        Locator::Register(String::from_utf8(class.to_vec()).unwrap()),
+    ))
 }
 
-fn find_locator(input: &str) -> IResult<&str, ()> {
+fn find_locator(input: &[u8]) -> IResult<&[u8], ()> {
     let (r, _) = (take_until("locator."), tag("locator.")).parse(input)?;
     Ok((r, ()))
 }
 
-fn find_locator_alt(input: &str) -> IResult<&str, ()> {
+fn find_locator_alt(input: &[u8]) -> IResult<&[u8], ()> {
     let (r, _) = (take_until("locator<"), tag("locator<")).parse(input)?;
     Ok((r, ()))
 }
 
-fn get_locator(input: &str) -> IResult<&str, Locator> {
+fn get_locator(input: &[u8]) -> IResult<&[u8], Locator> {
     let (s, (_, l)) = (find_locator, alt((import, register_locator, get, get_alt))).parse(input)?;
     Ok((s, l))
 }
 
-fn get_locator_alt(input: &str) -> IResult<&str, Locator> {
+fn get_locator_alt(input: &[u8]) -> IResult<&[u8], Locator> {
     let (s, (_, l)) = (
         find_locator_alt,
         alt((import, register_locator, get, get_alt)),
@@ -56,7 +57,7 @@ fn get_locator_alt(input: &str) -> IResult<&str, Locator> {
     Ok((s, l))
 }
 
-fn import(input: &str) -> IResult<&str, Locator> {
+fn import(input: &[u8]) -> IResult<&[u8], Locator> {
     let (s, _) = tag("dart")(input)?;
     Ok((s, Locator::Import))
 }
@@ -67,7 +68,7 @@ fn import(input: &str) -> IResult<&str, Locator> {
 /// - `locator.register...<GetIt>(() => ...);`
 /// - `locator.get<GetIt>();`
 /// - `locator<GetIt>();`
-pub fn locator(input: &str) -> IResult<&str, Vec<Locator>> {
+pub fn locator(input: &[u8]) -> IResult<&[u8], Vec<Locator>> {
     let (r1, l) = many0(get_locator).parse(input)?;
     let (r2, x) = many0(get_locator_alt).parse(input)?;
     let mut s = l;
@@ -79,7 +80,7 @@ pub fn locator(input: &str) -> IResult<&str, Vec<Locator>> {
     }
 }
 
-fn get(input: &str) -> IResult<&str, Locator> {
+fn get(input: &[u8]) -> IResult<&[u8], Locator> {
     let (remaining, (_, _, _, class)) = (
         multispace0,
         tag("get"),
@@ -87,12 +88,22 @@ fn get(input: &str) -> IResult<&str, Locator> {
         delimited(tag("<"), is_alphanumeric_or_underscore, tag(">")),
     )
         .parse(input)?;
-    Ok((remaining, Locator::Get(class.to_string())))
+    Ok((
+        remaining,
+        Locator::Get(String::from_utf8(class.to_vec()).unwrap()),
+    ))
 }
 
-fn get_alt(input: &str) -> IResult<&str, Locator> {
+fn is_alphanumeric_or_underscore(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    take_till(|c: u8| !c.is_ascii_alphanumeric() && c != b'_' && c != b'.').parse(input)
+}
+
+fn get_alt(input: &[u8]) -> IResult<&[u8], Locator> {
     let (remaining, (_, class)) = (multispace0, take_until(">")).parse(input)?;
-    Ok((remaining, Locator::Get(class.to_string())))
+    Ok((
+        remaining,
+        Locator::Get(String::from_utf8(class.to_vec()).unwrap()),
+    ))
 }
 
 #[cfg(test)]
@@ -101,70 +112,95 @@ mod tests {
 
     #[test]
     fn test_locator() {
-        let input = r#"register<GetIt>();"#;
+        let input = br#"register<GetIt>();"#;
         let result = register_locator(input);
-        assert_eq!(result, Ok(("();", Locator::Register("GetIt".to_string()))));
+        assert_eq!(
+            result,
+            Ok(("();".as_bytes(), Locator::Register("GetIt".to_string())))
+        );
     }
 
     #[test]
     fn test_locator_singleton() {
-        let input = r#"registerLazySingleton<GetIt>();"#;
+        let input = br#"registerLazySingleton<GetIt>();"#;
         let result = register_locator(input);
-        assert_eq!(result, Ok(("();", Locator::Register("GetIt".to_string()))));
+        assert_eq!(
+            result,
+            Ok(("();".as_bytes(), Locator::Register("GetIt".to_string())))
+        );
     }
 
     #[test]
     fn test_locator_factory() {
-        let input = r#"registerFactory<GetIt>();"#;
+        let input = br#"registerFactory<GetIt>();"#;
         let result = register_locator(input);
-        assert_eq!(result, Ok(("();", Locator::Register("GetIt".to_string()))));
+        assert_eq!(
+            result,
+            Ok(("();".as_bytes(), Locator::Register("GetIt".to_string())))
+        );
     }
 
     #[test]
     fn test_locator_parent() {
-        let input = r#"locator.register<GetIt>();"#;
+        let input = br#"locator.register<GetIt>();"#;
         let result = get_locator(input);
-        assert_eq!(result, Ok(("();", Locator::Register("GetIt".to_string()))));
+        assert_eq!(
+            result,
+            Ok(("();".as_bytes(), Locator::Register("GetIt".to_string())))
+        );
     }
 
     #[test]
     fn test_locator_singleton_parent() {
-        let input = r#"locator.registerLazySingleton<GetIt>();"#;
+        let input = br#"locator.registerLazySingleton<GetIt>();"#;
         let result = get_locator(input);
-        assert_eq!(result, Ok(("();", Locator::Register("GetIt".to_string()))));
+        assert_eq!(
+            result,
+            Ok(("();".as_bytes(), Locator::Register("GetIt".to_string())))
+        );
     }
 
     #[test]
     fn test_locator_factory_parent() {
-        let input = r#"locator.registerFactory<GetIt>();"#;
+        let input = br#"locator.registerFactory<GetIt>();"#;
         let result = get_locator(input);
-        assert_eq!(result, Ok(("();", Locator::Register("GetIt".to_string()))));
+        assert_eq!(
+            result,
+            Ok(("();".as_bytes(), Locator::Register("GetIt".to_string())))
+        );
     }
 
     #[test]
     fn test_get_locator() {
-        let input = r#"locator.get<GetIt>();"#;
+        let input = br#"locator.get<GetIt>();"#;
         let result = get_locator(input);
-        assert_eq!(result, Ok(("();", Locator::Get("GetIt".to_string()))));
+        assert_eq!(
+            result,
+            Ok(("();".as_bytes(), Locator::Get("GetIt".to_string())))
+        );
     }
 
     #[test]
     fn test_get_locator_alt() {
-        let input = r#"locator<GetIt>();"#;
+        let input = br#"locator<GetIt>();"#;
         let result = get_locator_alt(input);
-        assert_eq!(result, Ok((">();", Locator::Get("GetIt".to_string()))));
+        assert_eq!(
+            result,
+            Ok((">();".as_bytes(), Locator::Get("GetIt".to_string())))
+        );
     }
 
     #[test]
     fn test_get_locator_in_register() {
         let input = r#"  locator.registerFactory<CreditApplicationContractBloc>(
       () => CreditApplicationContractBloc(locator.get<DownloadContractUseCase>(),
-       locator<DownloadContractsUseCase>()));"#;
+       locator<DownloadContractsUseCase>()));"#
+            .as_bytes();
         let result = locator(input);
         assert_eq!(
             result,
             Ok((
-                ">()));",
+                ">()));".as_bytes(),
                 vec![
                     Locator::Register("CreditApplicationContractBloc".to_string()),
                     Locator::Get("DownloadContractUseCase".to_string()),
@@ -176,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_locators_multiple() {
-        let input = r#"
+        let input = br#"
     locator.registerLazySingleton<ChatPageBloc>(() => ChatPageBloc(
       locator<UserInfoNotifier>(),
       locator<ChatConnectionNotifier>(),
@@ -205,7 +241,8 @@ mod tests {
       domain.sendAttachmentUseCase,
       domain.createChatCacheUseCase,
       domain.updateChatCacheUseCase,
-      appConfig.testMode));"#,
+      appConfig.testMode));"#
+                    .as_bytes(),
                 vec![
                     Locator::Register("ChatPageBloc".to_string()),
                     Locator::Get("UserInfoNotifier".to_string()),
@@ -333,14 +370,14 @@ Future<void> serviceOperationsLocator(
         getOrderUseCase: domain.getOrderUseCase,
       ));
 }
-"#;
+"#.as_bytes();
 
         let result = locator(input);
 
         assert_eq!(
             result,
             Ok((
-                "(() => OrderTrackingStatusBloc(\n        getOrderUseCase: domain.getOrderUseCase,\n      ));\n}\n",
+                "(() => OrderTrackingStatusBloc(\n        getOrderUseCase: domain.getOrderUseCase,\n      ));\n}\n".as_bytes(),
                 vec![
                     Locator::Import,
                     Locator::Register("ChatConnectionNotifier".to_string()),
