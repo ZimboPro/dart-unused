@@ -1,0 +1,19 @@
+{
+    "cSpell.words": [
+        "Analyzing",
+        "corasick",
+        "dedot",
+        "flavor",
+        "hashbrown",
+        "memchr",
+        "memmap",
+        "memmem",
+        "multispace",
+        "pubspec",
+        "serde",
+        "simplelog",
+        "walkdir",
+        "Zimbo"
+    ],
+    "rust-analyzer.cargo.targetDir": true
+}
