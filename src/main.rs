@@ -53,6 +53,7 @@ struct BufferedWriteLogger {
     level: LevelFilter,
     buffer: std::sync::Mutex<Vec<u8>>,
     file: Option<PathBuf>,
+    log_file: Option<std::fs::File>,
 }
 
 impl BufferedWriteLogger {
@@ -64,6 +65,17 @@ impl BufferedWriteLogger {
     pub fn new(log_level: LevelFilter, file: Option<PathBuf>) -> Box<BufferedWriteLogger> {
         Box::new(BufferedWriteLogger {
             level: log_level,
+            log_file: if let Some(file) = &file {
+                Some(
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(file)
+                        .unwrap(),
+                )
+            } else {
+                None
+            },
             file,
             buffer: std::sync::Mutex::new(Vec::new()),
         })
@@ -89,14 +101,8 @@ impl Log for BufferedWriteLogger {
         if !buffer.is_empty() {
             std::io::stdout().write_all(&buffer).unwrap();
             std::io::stdout().flush().unwrap();
-            if let Some(file) = &self.file {
-                std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(file)
-                    .unwrap()
-                    .write_all(&buffer)
-                    .unwrap();
+            if let Some(file) = self.log_file.as_ref().as_mut() {
+                file.write_all(&buffer).unwrap();
             }
             buffer.clear();
         }
@@ -105,7 +111,16 @@ impl Log for BufferedWriteLogger {
 
 impl Drop for BufferedWriteLogger {
     fn drop(&mut self) {
-        self.flush();
+        println!("Flushing logs...");
+        let mut buffer = self.buffer.lock().unwrap();
+        if !buffer.is_empty() {
+            std::io::stdout().write_all(&buffer).unwrap();
+            std::io::stdout().flush().unwrap();
+            if let Some(file) = &mut self.log_file {
+                file.write_all(&buffer).unwrap();
+            }
+            buffer.clear();
+        }
     }
 }
 
