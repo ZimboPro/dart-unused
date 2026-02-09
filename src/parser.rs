@@ -43,7 +43,7 @@ impl TryFrom<&DartFile> for DartFile {
     type Error = &'static str;
 
     fn try_from(value: &DartFile) -> Result<Self, Self::Error> {
-        log::info!("Parsing: {:?}", value);
+        log::debug!("Parsing: {:?}", value);
         if let DartFile::Import(path) = &value
             && path.contains(":")
         {

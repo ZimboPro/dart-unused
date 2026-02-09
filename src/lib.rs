@@ -21,7 +21,7 @@ pub mod pubspec;
 pub mod util;
 
 use crate::{
-    assets::{AssetItem, get_all_items_in_asset_dir, get_assets},
+    assets::{AssetItem, get_assets},
     localisation::all_localisation,
 };
 
@@ -36,11 +36,9 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     util::set_current_dir(&args.path)?;
     info!("Current directory set to {:?}", std::env::current_dir()?);
     let pubspec = pubspec::get_package_details()?;
-    let mut flutter = Option::None;
-    let assets = if args.assets && pubspec.flutter.is_present() {
-        flutter = pubspec.flutter.to_optional();
+    let mut all_assets = if args.assets && pubspec.flutter.is_present() {
         get_assets(
-            flutter.as_ref().unwrap().get_assets(),
+            pubspec.flutter.to_optional().as_ref().unwrap().get_assets(),
             &config.assets.ignore,
         )?
     } else {
@@ -48,7 +46,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     };
 
     let registered_assets: hashbrown::HashSet<PathBuf> =
-        assets.iter().map(|x| x.path.clone()).collect();
+        all_assets.iter().map(|x| x.path.clone()).collect();
 
     let mut deps: hashbrown::HashSet<String> = if args.deps {
         pubspec.dependencies.keys().cloned().collect()
@@ -69,10 +67,10 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     let dart = glob("lib/**/*.dart").expect("Failed to read glob pattern");
     let dart: Vec<PathBuf> = dart.flatten().collect();
     let mut assets_set: papaya::HashSet<AssetItem, DefaultHashBuilder> =
-        papaya::HashSet::from_iter(assets);
+        papaya::HashSet::from_iter(all_assets.clone());
 
     let locator: papaya::HashMap<String, bool> = papaya::HashMap::with_capacity(dart.len() / 10);
-    let labels: papaya::HashSet<String> = papaya::HashSet::with_capacity(dart.len() / 10);
+    let labels: papaya::HashSet<String> = papaya::HashSet::with_capacity(dart.len() / 2);
 
     let results: hashbrown::HashMap<PathBuf, Data> = dart
         .clone()
@@ -113,10 +111,8 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
             );
         }
         log::info!("");
-        let mut all_assets: Vec<PathBuf> =
-            get_all_items_in_asset_dir(&flutter.unwrap().get_asset_paths(), &config.assets.ignore)?;
 
-        all_assets.retain(|x| !registered_assets.contains(x));
+        all_assets.retain(|x| !registered_assets.contains(&x.path));
 
         if !all_assets.is_empty() {
             for asset in all_assets.iter().enumerate() {
@@ -130,7 +126,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
                 std::fs::remove_file(asset)?;
             }
             for asset in all_assets.iter() {
-                std::fs::remove_file(asset)?;
+                std::fs::remove_file(&asset.path)?;
             }
         }
         log::logger().flush();
