@@ -19,7 +19,7 @@ clap = { version = "4.5.54", features = ["derive"] }
 glob = "0.3.3"
 hashbrown = { version = "0.16.1", features = ["rayon"] }
 log = "0.4.29"
-memchr = "2.7.6"
+memchr = "2.8.0"
 # memmap2 = "0.9.9"
 nom = "8.0.0"
 papaya = "0.2.3"
