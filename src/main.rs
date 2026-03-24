@@ -1,7 +1,7 @@
 use dart_unused::{cli::Options, get_unreferenced_files};
 use log::{LevelFilter, Log, Metadata, Record, SetLoggerError, set_boxed_logger, set_max_level};
 
-use std::{io::Write, path::PathBuf};
+use std::{io::Write, panic, path::PathBuf};
 
 use clap::Parser;
 
@@ -26,6 +26,13 @@ pub struct Args {
     pub labels: bool,
     #[arg(long, help = "List items registered in locator but not used")]
     pub loc: bool,
+    #[arg(
+        long,
+        help = "List of entry files. Especially if there are flavours (Default: main.dart)",
+        num_args = 1..,
+        value_delimiter = ' '
+    )]
+    pub entries: Vec<PathBuf>,
     #[arg(short, long, help = "Enable verbose logging")]
     pub verbose: bool,
     // #[arg(long, short)]
@@ -45,6 +52,12 @@ impl From<Args> for Options {
             loc: val.loc,
             path: val.path,
             remove: val.remove,
+            entries: if val.entries.is_empty() {
+                let main = PathBuf::from("lib/main.dart");
+                vec![main]
+            } else {
+                val.entries
+            },
         }
     }
 }
@@ -130,5 +143,9 @@ fn main() -> anyhow::Result<()> {
     } else {
         BufferedWriteLogger::init(log_level, None)?;
     }
+    panic::set_hook(Box::new(|info| {
+        log::error!("Panic occurred: {:?}", info);
+        log::logger().flush();
+    }));
     get_unreferenced_files(args.into())
 }

@@ -53,7 +53,7 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     } else {
         hashbrown::HashSet::new()
     };
-    // TODO allow to set entry point
+
     if args.labels && pubspec.flutter_intl.is_present() {
         localisation::set_class_name(&pubspec.flutter_intl.unwrap().class_name)?;
     } else if args.labels && pubspec.flutter_intl.is_empty() {
@@ -62,7 +62,6 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
             "flutter_intl section not found in pubspec.yaml"
         ));
     }
-    let main = PathBuf::from("lib/main.dart");
 
     let dart = glob("lib/**/*.dart").expect("Failed to read glob pattern");
     let dart: Vec<PathBuf> = dart.flatten().collect();
@@ -98,7 +97,44 @@ pub fn get_unreferenced_files(args: cli::Options) -> anyhow::Result<()> {
     let mut dart: hashbrown::HashSet<PathBuf> = dart.into_iter().collect();
 
     // Collect all the linked files from the entry file
-    collapse_list(&main, &results, &mut dart, &mut assets_set, &mut deps);
+    for entry in args.entries {
+        // ensure that entry starts with lib
+        let sections = entry.components();
+        let ind = sections
+            .enumerate()
+            .find(|x| x.1 == std::path::Component::Normal(std::ffi::OsStr::new("lib")));
+        if ind.is_some() {
+            match entry.strip_prefix(&args.path) {
+                Ok(e) => {
+                    dart.remove(e);
+                    log::debug!(
+                        "Successfully stripped prefix from entry: {:?} -> {:?}",
+                        entry,
+                        e
+                    );
+                    collapse_list(
+                        &e.to_path_buf(),
+                        &results,
+                        &mut dart,
+                        &mut assets_set,
+                        &mut deps,
+                    );
+                }
+                Err(_) => {
+                    log::debug!(
+                        "Failed to strip prefix from entry: {:?}, using original path",
+                        entry
+                    );
+                    dart.remove(&entry);
+                    collapse_list(&entry, &results, &mut dart, &mut assets_set, &mut deps);
+                }
+            }
+        } else {
+            return Err(anyhow::anyhow!(
+                "The path is of the entry files is expecting to contain 'lib'"
+            ));
+        }
+    }
 
     if !assets_set.is_empty() {
         let assets_set = assets_set.pin();
@@ -386,6 +422,7 @@ fn collapse_list(
     assets: &mut papaya::HashSet<AssetItem, DefaultHashBuilder>,
     deps: &mut hashbrown::HashSet<String>,
 ) {
+    log::debug!("Collapsing file: {:?}", path);
     let file = files.get(path).unwrap();
     for entry in &file.items {
         match entry {

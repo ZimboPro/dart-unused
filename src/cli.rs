@@ -6,6 +6,7 @@ pub struct Options {
     pub remove: bool,
     pub assets: bool,
     pub deps: bool,
+    pub entries: Vec<PathBuf>,
     // pub dart: bool,
     pub labels: bool,
     pub loc: bool,
