@@ -2,7 +2,7 @@ use nom::{
     IResult, Parser,
     branch::alt,
     bytes::complete::{tag, take_till, take_until},
-    character::complete::{alphanumeric1, multispace0},
+    character::complete::multispace0,
     multi::many0,
 };
 use std::sync::OnceLock;
@@ -21,7 +21,7 @@ pub fn set_class_name(class_name: &str) -> anyhow::Result<()> {
 
 /// Parse all localisation keys from a string
 pub fn all_localisation(input: &[u8]) -> IResult<&[u8], Vec<&[u8]>> {
-    many0(localisation).parse(input)
+    many0(alt((localisation, localisation_as_class))).parse(input)
 }
 
 /// Parse a single localisation key from a string
@@ -41,11 +41,25 @@ pub fn localisation(input: &[u8]) -> IResult<&[u8], &[u8]> {
     Ok((remaining, key))
 }
 
+fn localisation_as_class(input: &[u8]) -> IResult<&[u8], &[u8]> {
+    let (remaining, (_, _, _, _, _, _, key)) = (
+        take_until(INSTANCE.get().unwrap().as_bytes()),
+        tag(INSTANCE.get().unwrap().as_bytes()),
+        multispace0,
+        tag("()"),
+        multispace0,
+        tag("."),
+        is_alphanumeric_or_underscore,
+    )
+        .parse(input)?;
+    Ok((remaining, key))
+}
+
 fn of_context(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let (remaining, _s) = (
         multispace0,
         tag("of("),
-        alphanumeric1, // Generally 'context' but not guaranteed
+        take_till(|c| c == b')'), // Generally 'context' but not guaranteed
         tag(")"),
     )
         .parse(input)?;
@@ -56,7 +70,7 @@ fn maybe_of(input: &[u8]) -> IResult<&[u8], &[u8]> {
     let (remaining, _s) = (
         multispace0,
         tag("maybeOf("),
-        alphanumeric1, // Generally 'context' but not guaranteed
+        take_till(|c| c == b')'), // Generally 'context' but not guaranteed
         tag(")"),
         multispace0,
         tag("?"),
@@ -198,6 +212,29 @@ mod tests {
         s: S.maybeOf(context)?.app_name""#;
         let expected = vec![b"app_name", b"app_name", b"app_name"];
         let (_, actual) = all_localisation(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_global_key_context() {
+        Once::new().call_once(|| {
+            let _ = INSTANCE.set("S".to_string());
+        });
+        let input = br#""S.of(context).app_name
+        S.of(navigatorKey.currentContext!).app_name""#;
+        let expected = vec![b"app_name", b"app_name"];
+        let (_, actual) = all_localisation(input).unwrap();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_localisation_as_class() {
+        Once::new().call_once(|| {
+            let _ = INSTANCE.set("S".to_string());
+        });
+        let input = b"S().app_name";
+        let expected = b"app_name";
+        let (_, actual) = localisation_as_class(input).unwrap();
         assert_eq!(expected, actual);
     }
 }
